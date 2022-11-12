@@ -1,6 +1,9 @@
 [workspace]
+resolver = "2"
 
 members = [
     "async-component",
-    "async-component-macro"
+    "async-component-macro",
+    
+    "examples/gui-demo"
 ]
