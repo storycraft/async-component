@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "async-component",
+    "async-component-macro"
+]

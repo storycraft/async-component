@@ -1,0 +1,18 @@
+[package]
+name = "async-component"
+version = "0.1.0"
+edition = "2021"
+
+authors = [
+    "storycraft <storycraft@pancake.sh>"
+]
+license = "Apache-2.0"
+
+[dependencies]
+futures = "0.3.25"
+pin-project = "1"
+async_cell = "0.2.1"
+async-component-macro = { path = "../async-component-macro" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
