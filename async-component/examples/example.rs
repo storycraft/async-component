@@ -31,11 +31,18 @@ async fn main() {
     .await;
 }
 
-async fn run(component: impl Stream<Item = ComponentPollFlags>) {
+trait Drawable {
+    fn draw(&self);
+}
+
+async fn run(component: impl Stream<Item = ComponentPollFlags> + Drawable) {
     pin_mut!(component);
 
     while let Some(flag) = component.next().await {
-        println!("Updated: {:?}", flag);
+        // Redraw since last render is invalid
+        if flag.contains(ComponentPollFlags::STATE) {
+            component.draw();
+        }
     }
 }
 
@@ -48,6 +55,14 @@ struct CounterComponent {
 impl CounterComponent {
     fn on_counter_update(&mut self) {
         println!("Counter updated to: {}", *self.counter);
+    }
+}
+
+impl Drawable for CounterComponent {
+    fn draw(&self) {
+        println!("===== Counter =====");
+        println!("counter: {}", *self.counter);
+        println!("===================");
     }
 }
 
@@ -83,5 +98,18 @@ impl LoginForm {
 
     fn on_counter_recv(&mut self, counter: i32) {
         *self.sub_component.counter = counter;
+    }
+}
+
+impl Drawable for LoginForm {
+    fn draw(&self) {
+        println!("===== LoginForm =====");
+        println!("id: {}", *self.id);
+        println!("password: {}", *self.password);
+        println!();
+        println!("sub_component");
+        self.sub_component.draw();
+        println!();
+        println!("=====================");
     }
 }
