@@ -11,7 +11,9 @@ States are never updated unless some event occur from outside.
 Using stream, we can poll for events from outside and apply update of changed value simultaneously.
 
 ## Example
-See `examples/example.rs` for working example.
+See `async_component/examples/example.rs` for simple example.
+
+See `examples/gui-demo` project for example using with gui.
 
 ### Code
 ```Rust
