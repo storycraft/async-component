@@ -73,7 +73,7 @@ impl Stream for CounterComponent {
             Pin::new(&mut self.counter),
             cx
         ).is_ready() {
-            Self::on_counter_update()
+            Self::on_counter_update(&mut self);
             result = Poll::Ready(Some(()));
         }
         
