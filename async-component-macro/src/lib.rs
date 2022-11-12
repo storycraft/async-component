@@ -174,7 +174,7 @@ fn field_component_stream_poll_body(
 ) -> TokenStream {
     let name = format_ident!("{}", name);
 
-    let method_call = method_name.map(|path| quote! { #path(&mut self); });
+    let method_call = method_name.map(|path| quote! { #path(&mut self, recv); });
 
     quote_spanned! { name.span() =>
         if let ::std::task::Poll::Ready(Some(recv))
