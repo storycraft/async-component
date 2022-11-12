@@ -1,6 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned, IdentFragment};
-use syn::{parse_macro_input, Attribute, Data, DeriveInput, ExprPath, Field, Fields, Ident, Index};
+use syn::{parse_macro_input, Attribute, Data, DeriveInput, ExprPath, Fields, Ident, Index};
 
 #[proc_macro_derive(Component, attributes(component, state, stream))]
 pub fn component_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -9,9 +9,9 @@ pub fn component_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     proc_macro::TokenStream::from(impl_component_stream(&input))
 }
 
-fn extract_component_attribute(attrs: &[Attribute]) -> Option<Option<ExprPath>> {
+fn extract_path_attribute(ident: &str, attrs: &[Attribute]) -> Option<Option<ExprPath>> {
     for attr in attrs {
-        if !attr.path.is_ident("component") {
+        if !attr.path.is_ident(ident) {
             continue;
         }
 
@@ -29,26 +29,25 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     let state_poll = state_stream_poll_body(&input.data);
-
-    let stream_poll = sub_stream_stream_poll_body(&input.data);
-
-    let state_update_call = extract_component_attribute(&input.attrs).map(|path| {
+    let state_update_call = extract_path_attribute("component", &input.attrs).map(|path| {
         quote! {
-            if result.is_ready() {
+            if !result.is_empty() {
                 #path(&mut self);
             }
         }
     });
+    let stream_poll = sub_stream_stream_poll_body(&input.data);
+    let component_poll = component_stream_poll_body(&input.data);
 
     quote! {
         impl #impl_generics ::futures::Stream for #name #ty_generics #where_clause {
-            type Item = ();
+            type Item = ::async_component::ComponentPollFlags;
 
             fn poll_next(
                 mut self: ::std::pin::Pin<&mut Self>,
                 cx: &mut ::std::task::Context<'_>
             ) -> ::std::task::Poll<Option<Self::Item>> {
-                let mut result = ::std::task::Poll::Pending;
+                let mut result = ::async_component::ComponentPollFlags::empty();
 
                 #state_poll
 
@@ -56,24 +55,16 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
 
                 #stream_poll
 
-                result
+                #component_poll
+
+                if result.is_empty() {
+                    ::std::task::Poll::Pending
+                } else {
+                    ::std::task::Poll::Ready(Some(result))
+                }
             }
         }
     }
-}
-
-fn extract_state_attribute(attrs: &[Attribute]) -> Option<Option<ExprPath>> {
-    for attr in attrs {
-        if !attr.path.is_ident("state") {
-            continue;
-        }
-
-        let method_path = attr.parse_args::<ExprPath>().ok();
-
-        return Some(method_path);
-    }
-
-    None
 }
 
 fn state_stream_poll_body(data: &Data) -> TokenStream {
@@ -81,7 +72,7 @@ fn state_stream_poll_body(data: &Data) -> TokenStream {
         Data::Struct(ref data) => match data.fields {
             Fields::Named(ref fields) => {
                 let iter = fields.named.iter().filter_map(|field| {
-                    let method_name = extract_state_attribute(&field.attrs)?;
+                    let method_name = extract_path_attribute("state", &field.attrs)?;
                     let name = field.ident.as_ref().unwrap();
 
                     Some(field_state_stream_poll_body(name, method_name))
@@ -97,7 +88,7 @@ fn state_stream_poll_body(data: &Data) -> TokenStream {
                     .iter()
                     .enumerate()
                     .filter_map(|(index, field)| {
-                        let method_name = extract_state_attribute(&field.attrs)?;
+                        let method_name = extract_path_attribute("state", &field.attrs)?;
                         let index = Index::from(index);
 
                         Some(field_state_stream_poll_body(index, method_name))
@@ -127,24 +118,71 @@ fn field_state_stream_poll_body(
 
     quote_spanned! { name.span() =>
         if ::async_component::StateCell::poll_changed(
-            ::std::pin::Pin::new(&mut self.#name), cx).is_ready() {
+            ::std::pin::Pin::new(&mut self.#name),
+            cx
+        ).is_ready() {
             #method_call
-            result = ::std::task::Poll::Ready(Some(()));
+            result |= ::async_component::ComponentPollFlags::STATE;
         }
     }
 }
 
-fn extract_stream_attribute(attrs: &[Attribute]) -> Option<Option<ExprPath>> {
-    for attr in attrs {
-        if !attr.path.is_ident("stream") {
-            continue;
-        }
+fn component_stream_poll_body(data: &Data) -> TokenStream {
+    match *data {
+        Data::Struct(ref data) => match data.fields {
+            Fields::Named(ref fields) => {
+                let iter = fields.named.iter().filter_map(|field| {
+                    let method_name = extract_path_attribute("component", &field.attrs)?;
+                    let name = field.ident.as_ref().unwrap();
 
-        let method_path = attr.parse_args::<ExprPath>().ok();
-        return Some(method_path);
+                    Some(field_component_stream_poll_body(name, method_name))
+                });
+
+                quote! {
+                    #(#iter)*
+                }
+            }
+            Fields::Unnamed(ref fields) => {
+                let iter = fields
+                    .unnamed
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, field)| {
+                        let method_name = extract_path_attribute("component", &field.attrs)?;
+                        let index = Index::from(index);
+
+                        Some(field_component_stream_poll_body(index, method_name))
+                    });
+
+                quote! {
+                    #(#iter)*
+                }
+            }
+            Fields::Unit => {
+                quote!()
+            }
+        },
+
+        Data::Enum(_) => todo!(),
+        Data::Union(_) => todo!(),
     }
+}
 
-    None
+fn field_component_stream_poll_body(
+    name: impl IdentFragment,
+    method_name: Option<ExprPath>,
+) -> TokenStream {
+    let name = format_ident!("{}", name);
+
+    let method_call = method_name.map(|path| quote! { #path(&mut self); });
+
+    quote_spanned! { name.span() =>
+        if let ::std::task::Poll::Ready(Some(recv))
+            = ::futures::Stream::poll_next(::std::pin::Pin::new(&mut self.#name), cx) {
+            #method_call
+            result |= recv | ::async_component::ComponentPollFlags::STREAM;
+        }
+    }
 }
 
 fn sub_stream_stream_poll_body(data: &Data) -> TokenStream {
@@ -152,7 +190,7 @@ fn sub_stream_stream_poll_body(data: &Data) -> TokenStream {
         Data::Struct(ref data) => match data.fields {
             Fields::Named(ref fields) => {
                 let iter = fields.named.iter().filter_map(|field| {
-                    let method_name = extract_stream_attribute(&field.attrs)?;
+                    let method_name = extract_path_attribute("stream", &field.attrs)?;
                     let name = field.ident.as_ref().unwrap();
 
                     Some(field_sub_stream_stream_poll_body(name, method_name))
@@ -168,7 +206,7 @@ fn sub_stream_stream_poll_body(data: &Data) -> TokenStream {
                     .iter()
                     .enumerate()
                     .filter_map(|(index, field)| {
-                        let method_name = extract_stream_attribute(&field.attrs)?;
+                        let method_name = extract_path_attribute("stream", &field.attrs)?;
                         let index = Index::from(index);
 
                         Some(field_sub_stream_stream_poll_body(index, method_name))
@@ -205,7 +243,7 @@ fn field_sub_stream_stream_poll_body(
         if let ::std::task::Poll::Ready(Some(#recv_item))
             = ::futures::Stream::poll_next(::std::pin::Pin::new(&mut self.#name), cx) {
             #method_call
-            result = ::std::task::Poll::Ready(Some(()));
+            result |= ::async_component::ComponentPollFlags::STREAM;
         }
     }
 }

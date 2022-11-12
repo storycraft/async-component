@@ -46,6 +46,7 @@ Counter updated to: ...
 ```
 
 ### Expanded
+Codes like this will be generated
 ```Rust
 use async_component::StateCell;
 use futures::Stream;
@@ -64,25 +65,29 @@ struct CounterComponent {
 }
 
 impl Stream for CounterComponent {
-    type Item = ();
+    type Item = ComponentPollFlags;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        let mut result = Poll::Pending;
+        let mut result = ComponentPollFlags::empty();
 
-        if async_component::StateCell::poll_changed(
+        if StateCell::poll_changed(
             Pin::new(&mut self.counter),
             cx
         ).is_ready() {
             Self::on_counter_update(&mut self);
-            result = Poll::Ready(Some(()));
+            result |= ComponentPollFlags::STATE;
         }
         
         if let Poll::Ready(Some(recv)) = Stream::poll_next(Pin::new(&mut self.counter_recv), cx) {
             Self::on_counter_recv(&mut self, recv);
-            result = Poll::Ready(Some(()));
+            result |= ComponentPollFlags::STREAM;
         }
 
-        result
+        if result.is_empty() {
+            Poll::Pending
+        } else {
+            Poll::Ready(Some(result))
+        }
     }
 }
 

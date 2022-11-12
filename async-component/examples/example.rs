@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use async_component::{Component, StateCell};
+use async_component::{Component, StateCell, ComponentPollFlags};
 use futures::{
     channel::mpsc::{channel, Receiver},
     pin_mut, SinkExt, Stream, StreamExt,
@@ -31,10 +31,12 @@ async fn main() {
     .await;
 }
 
-async fn run(component: impl Stream) {
+async fn run(component: impl Stream<Item = ComponentPollFlags>) {
     pin_mut!(component);
 
-    while let Some(_) = component.next().await {}
+    while let Some(flag) = component.next().await {
+        println!("Updated: {:?}", flag);
+    }
 }
 
 #[derive(Debug, Component)]
@@ -59,7 +61,7 @@ struct LoginForm {
     #[state(Self::on_password_update)]
     password: StateCell<String>,
 
-    #[stream]
+    #[component]
     sub_component: CounterComponent,
 
     #[stream(Self::on_counter_recv)]

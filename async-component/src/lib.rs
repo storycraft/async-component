@@ -6,6 +6,8 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
+use bitflags::bitflags;
+
 #[derive(Debug)]
 pub struct StateCell<T> {
     status: StateStatus,
@@ -94,5 +96,12 @@ pub enum StateStatus {
 impl Default for StateStatus {
     fn default() -> Self {
         Self::None
+    }
+}
+
+bitflags! {
+    pub struct ComponentPollFlags: u32 {
+        const STATE = 0b00000001;
+        const STREAM = 0b00000010;
     }
 }
