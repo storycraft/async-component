@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use async_component::{Component, StateCell, ComponentPollFlags};
+use async_component::{Component, ComponentPollFlags, StateCell};
 use futures::{
     channel::mpsc::{channel, Receiver},
     pin_mut, SinkExt, Stream, StreamExt,
@@ -48,14 +48,8 @@ async fn run(component: impl Stream<Item = ComponentPollFlags> + Drawable) {
 
 #[derive(Debug, Component)]
 struct CounterComponent {
-    #[state(Self::on_counter_update)]
+    #[state]
     pub counter: StateCell<i32>,
-}
-
-impl CounterComponent {
-    fn on_counter_update(&mut self) {
-        println!("Counter updated to: {}", *self.counter);
-    }
 }
 
 impl Drawable for CounterComponent {
