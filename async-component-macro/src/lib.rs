@@ -28,7 +28,6 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
 
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    let state_poll = state_stream_poll_body(&input.data);
     let state_update_call = extract_path_attribute("component", &input.attrs).map(|path| {
         quote! {
             if !result.is_empty() {
@@ -36,8 +35,26 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
             }
         }
     });
-    let stream_poll = sub_stream_stream_poll_body(&input.data);
-    let component_poll = component_stream_poll_body(&input.data);
+
+    let poll_next_body = match input.data {
+        Data::Struct(ref data) => {
+            let state_poll = state_stream_poll_body(&data.fields);
+            let stream_poll = sub_stream_stream_poll_body(&data.fields);
+            let component_poll = component_stream_poll_body(&data.fields);
+
+            quote! {
+                #state_poll
+
+                #state_update_call
+
+                #stream_poll
+
+                #component_poll
+            }
+        }
+        Data::Enum(_) => todo!(),
+        Data::Union(_) => todo!(),
+    };
 
     quote! {
         impl #impl_generics ::futures::Stream for #name #ty_generics #where_clause {
@@ -49,13 +66,7 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
             ) -> ::std::task::Poll<Option<Self::Item>> {
                 let mut result = ::async_component::ComponentPollFlags::empty();
 
-                #state_poll
-
-                #state_update_call
-
-                #stream_poll
-
-                #component_poll
+                #poll_next_body
 
                 if result.is_empty() {
                     ::std::task::Poll::Pending
@@ -67,44 +78,39 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
     }
 }
 
-fn state_stream_poll_body(data: &Data) -> TokenStream {
-    match *data {
-        Data::Struct(ref data) => match data.fields {
-            Fields::Named(ref fields) => {
-                let iter = fields.named.iter().filter_map(|field| {
-                    let method_name = extract_path_attribute("state", &field.attrs)?;
-                    let name = field.ident.as_ref().unwrap();
+fn state_stream_poll_body(fields: &Fields) -> TokenStream {
+    match fields {
+        Fields::Named(fields) => {
+            let iter = fields.named.iter().filter_map(|field| {
+                let method_name = extract_path_attribute("state", &field.attrs)?;
+                let name = field.ident.as_ref().unwrap();
 
-                    Some(field_state_stream_poll_body(name, method_name))
+                Some(field_state_stream_poll_body(name, method_name))
+            });
+
+            quote! {
+                #(#iter)*
+            }
+        }
+        Fields::Unnamed(fields) => {
+            let iter = fields
+                .unnamed
+                .iter()
+                .enumerate()
+                .filter_map(|(index, field)| {
+                    let method_name = extract_path_attribute("state", &field.attrs)?;
+                    let index = Index::from(index);
+
+                    Some(field_state_stream_poll_body(index, method_name))
                 });
 
-                quote! {
-                    #(#iter)*
-                }
+            quote! {
+                #(#iter)*
             }
-            Fields::Unnamed(ref fields) => {
-                let iter = fields
-                    .unnamed
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, field)| {
-                        let method_name = extract_path_attribute("state", &field.attrs)?;
-                        let index = Index::from(index);
-
-                        Some(field_state_stream_poll_body(index, method_name))
-                    });
-
-                quote! {
-                    #(#iter)*
-                }
-            }
-            Fields::Unit => {
-                quote!()
-            }
-        },
-
-        Data::Enum(_) => todo!(),
-        Data::Union(_) => todo!(),
+        }
+        Fields::Unit => {
+            quote!()
+        }
     }
 }
 
@@ -127,44 +133,39 @@ fn field_state_stream_poll_body(
     }
 }
 
-fn component_stream_poll_body(data: &Data) -> TokenStream {
-    match *data {
-        Data::Struct(ref data) => match data.fields {
-            Fields::Named(ref fields) => {
-                let iter = fields.named.iter().filter_map(|field| {
-                    let method_name = extract_path_attribute("component", &field.attrs)?;
-                    let name = field.ident.as_ref().unwrap();
+fn component_stream_poll_body(fields: &Fields) -> TokenStream {
+    match fields {
+        Fields::Named(fields) => {
+            let iter = fields.named.iter().filter_map(|field| {
+                let method_name = extract_path_attribute("component", &field.attrs)?;
+                let name = field.ident.as_ref().unwrap();
 
-                    Some(field_component_stream_poll_body(name, method_name))
+                Some(field_component_stream_poll_body(name, method_name))
+            });
+
+            quote! {
+                #(#iter)*
+            }
+        }
+        Fields::Unnamed(fields) => {
+            let iter = fields
+                .unnamed
+                .iter()
+                .enumerate()
+                .filter_map(|(index, field)| {
+                    let method_name = extract_path_attribute("component", &field.attrs)?;
+                    let index = Index::from(index);
+
+                    Some(field_component_stream_poll_body(index, method_name))
                 });
 
-                quote! {
-                    #(#iter)*
-                }
+            quote! {
+                #(#iter)*
             }
-            Fields::Unnamed(ref fields) => {
-                let iter = fields
-                    .unnamed
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, field)| {
-                        let method_name = extract_path_attribute("component", &field.attrs)?;
-                        let index = Index::from(index);
-
-                        Some(field_component_stream_poll_body(index, method_name))
-                    });
-
-                quote! {
-                    #(#iter)*
-                }
-            }
-            Fields::Unit => {
-                quote!()
-            }
-        },
-
-        Data::Enum(_) => todo!(),
-        Data::Union(_) => todo!(),
+        }
+        Fields::Unit => {
+            quote!()
+        }
     }
 }
 
@@ -185,44 +186,39 @@ fn field_component_stream_poll_body(
     }
 }
 
-fn sub_stream_stream_poll_body(data: &Data) -> TokenStream {
-    match *data {
-        Data::Struct(ref data) => match data.fields {
-            Fields::Named(ref fields) => {
-                let iter = fields.named.iter().filter_map(|field| {
-                    let method_name = extract_path_attribute("stream", &field.attrs)?;
-                    let name = field.ident.as_ref().unwrap();
+fn sub_stream_stream_poll_body(fields: &Fields) -> TokenStream {
+    match fields {
+        Fields::Named(fields) => {
+            let iter = fields.named.iter().filter_map(|field| {
+                let method_name = extract_path_attribute("stream", &field.attrs)?;
+                let name = field.ident.as_ref().unwrap();
 
-                    Some(field_sub_stream_stream_poll_body(name, method_name))
+                Some(field_sub_stream_stream_poll_body(name, method_name))
+            });
+
+            quote! {
+                #(#iter)*
+            }
+        }
+        Fields::Unnamed(fields) => {
+            let iter = fields
+                .unnamed
+                .iter()
+                .enumerate()
+                .filter_map(|(index, field)| {
+                    let method_name = extract_path_attribute("stream", &field.attrs)?;
+                    let index = Index::from(index);
+
+                    Some(field_sub_stream_stream_poll_body(index, method_name))
                 });
 
-                quote! {
-                    #(#iter)*
-                }
+            quote! {
+                #(#iter)*
             }
-            Fields::Unnamed(ref fields) => {
-                let iter = fields
-                    .unnamed
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, field)| {
-                        let method_name = extract_path_attribute("stream", &field.attrs)?;
-                        let index = Index::from(index);
-
-                        Some(field_sub_stream_stream_poll_body(index, method_name))
-                    });
-
-                quote! {
-                    #(#iter)*
-                }
-            }
-            Fields::Unit => {
-                quote!()
-            }
-        },
-
-        Data::Enum(_) => todo!(),
-        Data::Union(_) => todo!(),
+        }
+        Fields::Unit => {
+            quote!()
+        }
     }
 }
 
