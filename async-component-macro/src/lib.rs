@@ -52,8 +52,8 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
                 #component_poll
             }
         }
-        Data::Enum(_) => todo!(),
-        Data::Union(_) => todo!(),
+        Data::Enum(_) => unimplemented!("Derive cannot be applied to enum"),
+        Data::Union(_) => unimplemented!("Derive cannot be applied to union"),
     };
 
     quote! {
