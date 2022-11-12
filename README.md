@@ -13,7 +13,7 @@ Using stream, we can poll for events from outside and apply update of changed va
 ## Example
 See `async_component/examples/example.rs` for simple example.
 
-See `examples/gui-demo` project for example using with gui.
+See `examples/gui-demo` project for example using with gui(winit, raqote, pixels).
 
 ### Code
 ```Rust
