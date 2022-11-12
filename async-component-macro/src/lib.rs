@@ -236,7 +236,7 @@ fn field_sub_stream_stream_poll_body(
     let method_call = method_name.map(|path| quote! { #path(&mut self, #recv_item); });
 
     quote_spanned! { name.span() =>
-        if let ::std::task::Poll::Ready(Some(#recv_item))
+        while let ::std::task::Poll::Ready(Some(#recv_item))
             = ::futures::Stream::poll_next(::std::pin::Pin::new(&mut self.#name), cx) {
             #method_call
             result |= ::async_component::ComponentPollFlags::STREAM;
