@@ -1,9 +1,9 @@
 # Async component
-Zero overhead component composing using async iterator (stream)
+Zero overhead component composition using async iterator (stream)
 
 The current goal is composing gui components easily without performance degrade in Rust.
 
-## Concept
+## Core concepts
 UI components are retained. It only need to recalculate some layout when properties are changed.
 
 States are never updated unless some event occur from outside.
@@ -41,31 +41,15 @@ impl CounterComponent {
 }
 ```
 
-Running this component stream will print initial value first and print changed value when new values are sent from channel.
+Running this component stream will print initial value first and print changed value if new values are sent through channel.
 ```
 Counter updated to: 0
 Counter updated to: ...
 ```
 
 ### Expanded
-Codes like this will be generated
+`Component` derive macro will generate `Stream` trait implementation for `CounterComponent` like below.
 ```Rust
-use async_component::StateCell;
-use futures::Stream;
-
-use std::{pin::Pin, task::{Poll, Context}};
-
-#[derive(Debug, Component)]
-struct CounterComponent {
-    // State
-    #[state(Self::on_counter_update)]
-    counter: StateCell<i32>,
-
-    // Stream
-    #[stream(Self::on_counter_recv)]
-    counter_recv: Receiver<i32>,
-}
-
 impl Stream for CounterComponent {
     type Item = ComponentPollFlags;
 
@@ -90,16 +74,6 @@ impl Stream for CounterComponent {
         } else {
             Poll::Ready(Some(result))
         }
-    }
-}
-
-impl CounterComponent {
-    fn on_counter_update(&mut self) {
-        println!("Counter updated to: {}", *self.counter);
-    }
-
-    fn on_counter_recv(&mut self, counter: i32) {
-        *self.sub_component.counter = counter;
     }
 }
 ```
