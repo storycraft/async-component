@@ -59,7 +59,7 @@ struct CounterComponent {
     #[state(Self::on_counter_update)]
     counter: StateCell<i32>,
 
-    // Stream or child components
+    // Stream
     #[stream(Self::on_counter_recv)]
     counter_recv: Receiver<i32>,
 }
