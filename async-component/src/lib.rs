@@ -1,4 +1,7 @@
+#![doc = "../readme.md"]
+
 pub use async_component_macro::Component;
+
 use pin_project::{pin_project, pinned_drop};
 
 use std::{
