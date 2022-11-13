@@ -86,7 +86,7 @@ impl<T> PinnedDrop for StateCell<T> {
 }
 
 #[derive(Debug, Clone)]
-pub enum StateStatus {
+enum StateStatus {
     None,
     Pending(Waker),
     Changed,
