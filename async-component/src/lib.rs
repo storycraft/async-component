@@ -1,4 +1,5 @@
 pub use async_component_macro::Component;
+use pin_project::{pin_project, pinned_drop};
 
 use std::{
     ops::{Deref, DerefMut},
@@ -9,6 +10,7 @@ use std::{
 use bitflags::bitflags;
 
 #[derive(Debug)]
+#[pin_project(PinnedDrop)]
 pub struct StateCell<T> {
     status: StateStatus,
     inner: T,
@@ -36,10 +38,7 @@ impl<T> StateCell<T> {
         }
     }
 
-    pub fn poll_changed(mut this: Pin<&mut Self>, cx: &mut Context) -> Poll<()>
-    where
-        Self: Unpin,
-    {
+    pub fn poll_changed(mut this: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
         match this.status {
             StateStatus::Pending(_) | StateStatus::None => {
                 this.status = StateStatus::Pending(cx.waker().clone());
@@ -77,11 +76,11 @@ impl<T> From<T> for StateCell<T> {
     }
 }
 
-impl<T> Drop for StateCell<T> {
-    fn drop(&mut self) {
+#[pinned_drop]
+impl<T> PinnedDrop for StateCell<T> {
+    fn drop(mut self: Pin<&mut Self>) {
         if let StateStatus::Pending(ref waker) = self.status {
             waker.wake_by_ref();
-            self.status = StateStatus::Changed;
         }
     }
 }
