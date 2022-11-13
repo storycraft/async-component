@@ -2,6 +2,10 @@
 
 pub use async_component_macro::Component;
 
+#[doc(hidden)]
+#[path = "exports.rs"]
+pub mod __private;
+
 use pin_project::{pin_project, pinned_drop};
 
 use std::{

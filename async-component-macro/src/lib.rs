@@ -57,7 +57,7 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
     };
 
     quote! {
-        impl #impl_generics ::futures::Stream for #name #ty_generics #where_clause {
+        impl #impl_generics ::async_component::__private::Stream for #name #ty_generics #where_clause {
             type Item = ::async_component::ComponentPollFlags;
 
             fn poll_next(
