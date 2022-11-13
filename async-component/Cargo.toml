@@ -3,6 +3,7 @@ name = "async-component"
 description = "Compose ui components with Stream"
 version = "0.1.0"
 edition = "2021"
+readme = "../readme.md"
 
 authors = [
     "storycraft <storycraft@pancake.sh>"
