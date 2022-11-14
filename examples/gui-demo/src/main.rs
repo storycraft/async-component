@@ -98,7 +98,7 @@ impl App {
         }
     }
 
-    // This is ok. However when using top-down propagated global events like this, consider calling [`AppElement::onevent`] directly on [`run`] method.
+    // This is ok. However when using top-down propagated global events like this, consider calling [`AppElement::onevent`] on [`run`] method for more efficiency.
     fn on_event(&mut self, event: Event<()>) {
         <Self as AppElement>::on_event(self, &event);
     }
