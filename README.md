@@ -26,6 +26,8 @@ struct CounterComponent {
     counter: StateCell<i32>,
 
     // Stream
+    // It iterates every queued items in single poll to prevent slowdown.
+    // If the stream is immediate and resolves indefinitely, the task will fall to infinite loop. See expanded code below.
     #[stream(Self::on_counter_recv)]
     counter_recv: Receiver<i32>,
 }
@@ -64,7 +66,7 @@ impl Stream for CounterComponent {
             result |= ComponentPollFlags::STATE;
         }
         
-        if let Poll::Ready(Some(recv)) = Stream::poll_next(Pin::new(&mut self.counter_recv), cx) {
+        while let Poll::Ready(Some(recv)) = Stream::poll_next(Pin::new(&mut self.counter_recv), cx) {
             Self::on_counter_recv(&mut self, recv);
             result |= ComponentPollFlags::STREAM;
         }
