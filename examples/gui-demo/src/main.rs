@@ -53,8 +53,10 @@ fn main() {
     });
 }
 
-trait Drawable {
+trait AppElement {
     fn draw(&self, target: &mut DrawTarget);
+
+    fn on_event(&mut self, _: &Event<()>) {}
 }
 
 #[derive(Component)]
@@ -96,7 +98,22 @@ impl App {
         }
     }
 
+    // This is ok. However when using top-down propagated global events like this, consider calling [`AppElement::onevent`] directly on [`run`] method.
     fn on_event(&mut self, event: Event<()>) {
+        <Self as AppElement>::on_event(self, &event);
+    }
+}
+
+impl AppElement for App {
+    fn draw(&self, target: &mut DrawTarget) {
+        self.center_box.draw(target);
+        self.cursor.draw(target);
+    }
+
+    fn on_event(&mut self, event: &Event<()>) {
+        self.center_box.on_event(event);
+        self.cursor.on_event(event);
+
         if let Event::WindowEvent {
             event: WindowEvent::CursorMoved { ref position, .. },
             ..
@@ -104,13 +121,6 @@ impl App {
         {
             *self.cursor.position = (position.x as _, position.y as _);
         }
-    }
-}
-
-impl Drawable for App {
-    fn draw(&self, target: &mut DrawTarget) {
-        self.center_box.draw(target);
-        self.cursor.draw(target);
     }
 }
 
@@ -136,7 +146,7 @@ impl<'a> Square<'a> {
     }
 }
 
-impl Drawable for Square<'_> {
+impl AppElement for Square<'_> {
     fn draw(&self, target: &mut DrawTarget) {
         target.fill_rect(
             self.position.0,
@@ -152,7 +162,7 @@ impl Drawable for Square<'_> {
 async fn run(
     mut pixels: Pixels,
     mut target: DrawTarget,
-    component: impl Stream<Item = ComponentPollFlags> + Drawable,
+    component: impl Stream<Item = ComponentPollFlags> + AppElement,
 ) {
     pin_mut!(component);
 
