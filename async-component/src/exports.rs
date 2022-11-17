@@ -1,1 +1,1 @@
-pub use futures::Stream;
+pub use futures_core::Stream;
