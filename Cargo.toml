@@ -5,5 +5,5 @@ members = [
     "async-component",
     "async-component-macro",
     
-    "examples/gui-demo"
+    "examples/*"
 ]

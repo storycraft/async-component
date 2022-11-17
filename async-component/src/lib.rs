@@ -6,7 +6,7 @@ pub use async_component_macro::Component;
 #[path = "exports.rs"]
 pub mod __private;
 
-use pin_project::{pin_project, pinned_drop};
+use pin_project::pin_project;
 
 use std::{
     ops::{Deref, DerefMut},
@@ -17,7 +17,7 @@ use std::{
 use bitflags::bitflags;
 
 #[derive(Debug)]
-#[pin_project(PinnedDrop)]
+#[pin_project]
 pub struct StateCell<T> {
     status: StateStatus,
     inner: T,
@@ -80,15 +80,6 @@ impl<T> DerefMut for StateCell<T> {
 impl<T> From<T> for StateCell<T> {
     fn from(value: T) -> Self {
         Self::new(value)
-    }
-}
-
-#[pinned_drop]
-impl<T> PinnedDrop for StateCell<T> {
-    fn drop(mut self: Pin<&mut Self>) {
-        if let StateStatus::Pending(ref waker) = self.status {
-            waker.wake_by_ref();
-        }
     }
 }
 
