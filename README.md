@@ -1,5 +1,5 @@
 # Async component
-Zero overhead component composition using async iterator (stream)
+Zero overhead reactive programming using async iterator (stream)
 
 The current goal is composing gui components easily without performance degrade in Rust.
 
