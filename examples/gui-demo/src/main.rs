@@ -62,10 +62,10 @@ trait AppElement {
 #[derive(Component)]
 pub struct App {
     #[component]
-    center_box: Square<'static>,
+    center_box: Square,
 
     #[component]
-    cursor: Square<'static>,
+    cursor: Square,
 
     #[stream(Self::on_event)]
     event_recv: Receiver<Event<'static, ()>>,
@@ -125,7 +125,7 @@ impl AppElement for App {
 }
 
 #[derive(Component)]
-pub struct Square<'a> {
+pub struct Square {
     #[state]
     pub position: StateCell<(f32, f32)>,
 
@@ -133,11 +133,11 @@ pub struct Square<'a> {
     pub size: StateCell<(f32, f32)>,
 
     #[state]
-    pub source: StateCell<Source<'a>>,
+    pub source: StateCell<Source<'static>>,
 }
 
-impl<'a> Square<'a> {
-    pub fn new(position: (f32, f32), size: (f32, f32), source: Source<'a>) -> Self {
+impl Square {
+    pub fn new(position: (f32, f32), size: (f32, f32), source: Source<'static>) -> Self {
         Self {
             position: position.into(),
             size: size.into(),
@@ -146,7 +146,7 @@ impl<'a> Square<'a> {
     }
 }
 
-impl AppElement for Square<'_> {
+impl AppElement for Square {
     fn draw(&self, target: &mut DrawTarget) {
         target.fill_rect(
             self.position.0,
