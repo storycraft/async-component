@@ -37,10 +37,8 @@ fn main() {
 
     thread::spawn(move || {
         futures::executor::block_on(async move {
-            let target = DrawTarget::new(window_size.width as _, window_size.height as _);
-
             let app = App::new(recv);
-            run(pixels, target, app).await;
+            run(pixels, window_size.into(), app).await;
         });
     });
 
@@ -161,19 +159,14 @@ impl AppElement for Square {
 
 async fn run(
     mut pixels: Pixels,
-    mut target: DrawTarget,
+    win_size: (f32, f32),
     component: impl Stream<Item = ComponentPollFlags> + AppElement,
 ) {
     pin_mut!(component);
 
     while let Some(flag) = component.next().await {
         if flag.contains(ComponentPollFlags::STATE) {
-            target.clear(SolidSource {
-                r: 0x00,
-                g: 0x00,
-                b: 0x00,
-                a: 0x00,
-            });
+            let mut target = DrawTarget::new(win_size.0 as _, win_size.1 as _);
 
             component.draw(&mut target);
 
