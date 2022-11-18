@@ -6,14 +6,11 @@ pub use async_component_macro::Component;
 #[path = "exports.rs"]
 pub mod __private;
 
-use pin_project::pin_project;
-
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 
 #[derive(Debug)]
-#[pin_project]
 pub struct StateCell<T> {
     status: StateStatus,
     inner: T,
