@@ -8,11 +8,7 @@ pub mod __private;
 
 use pin_project::pin_project;
 
-use std::{
-    ops::{Deref, DerefMut},
-    pin::Pin,
-    task::{Context, Poll, Waker},
-};
+use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 
@@ -31,31 +27,20 @@ impl<T> StateCell<T> {
         }
     }
 
-    pub fn set_changed(this: &mut Self) {
-        match this.status {
-            StateStatus::None => this.status = StateStatus::Changed,
-
-            StateStatus::Pending(ref waker) => {
-                waker.wake_by_ref();
-
-                this.status = StateStatus::Changed;
-            }
-
-            StateStatus::Changed => {}
+    pub fn invalidate(this: &mut Self) {
+        if let StateStatus::None = this.status {
+            this.status = StateStatus::Changed;
         }
     }
 
-    pub fn poll_changed(mut this: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+    pub fn refresh(mut this: &mut Self) -> bool {
         match this.status {
-            StateStatus::Pending(_) | StateStatus::None => {
-                this.status = StateStatus::Pending(cx.waker().clone());
-
-                Poll::Pending
-            }
+            StateStatus::None => false,
 
             StateStatus::Changed => {
                 this.status = StateStatus::None;
-                Poll::Ready(())
+
+                true
             }
         }
     }
@@ -71,7 +56,7 @@ impl<T> Deref for StateCell<T> {
 
 impl<T> DerefMut for StateCell<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        StateCell::set_changed(self);
+        StateCell::invalidate(self);
 
         &mut self.inner
     }
@@ -86,7 +71,6 @@ impl<T> From<T> for StateCell<T> {
 #[derive(Debug, Clone)]
 enum StateStatus {
     None,
-    Pending(Waker),
     Changed,
 }
 
