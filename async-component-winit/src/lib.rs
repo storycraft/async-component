@@ -33,15 +33,18 @@ pub fn run(
     let scheduled = Arc::new(AtomicBool::new(false));
 
     let proxy = event_loop.create_proxy();
-    proxy.send_event(ExecutorPollEvent).ok();
 
-    let waker = create_waker(scheduled.clone(), proxy.clone());
+    let waker = create_waker(scheduled.clone());
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            Event::UserEvent(_) => {
-                scheduled.store(false, Ordering::Release);
+            Event::MainEventsCleared => {
+                component.on_event(Event::MainEventsCleared, control_flow);
+
+                let _ =
+                    scheduled.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire);
+
                 if let Poll::Ready(_) =
                     Pin::new(&mut component).poll_next(&mut Context::from_waker(&waker))
                 {
@@ -49,7 +52,12 @@ pub fn run(
                 }
             }
 
-            event => {
+            Event::UserEvent(_) => {
+                // Polled again by Event::MainEventsCleared
+                let _ = Pin::new(&mut component).poll_next(&mut Context::from_waker(&waker));
+            }
+
+            _ => {
                 component.on_event(event.map_nonuser_event().unwrap(), control_flow);
             }
         }
