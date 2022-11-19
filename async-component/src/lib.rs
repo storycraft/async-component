@@ -108,7 +108,7 @@ impl<T> StateCell<T> {
     }
 
     pub fn poll_changed(this: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        // SAFETY: Fields in StateCell is never considered pinned
+        // SAFETY: Fields in StateCell are never pinned
         match this.status {
             StateStatus::None | StateStatus::Pending(_) => {
                 unsafe { this.get_unchecked_mut().status = StateStatus::Pending(cx.waker().clone()); }
