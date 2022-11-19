@@ -2,7 +2,11 @@ use async_component::{AsyncComponent, ComponentPollFlags};
 use async_component_winit::WinitComponent;
 use pixels::{Pixels, SurfaceTexture};
 use raqote::DrawTarget;
-use winit::{window::Window, event::{Event, WindowEvent}, event_loop::ControlFlow};
+use winit::{
+    event::{Event, WindowEvent},
+    event_loop::ControlFlow,
+    window::Window,
+};
 
 pub trait AppElement {
     fn draw(&self, target: &mut DrawTarget);

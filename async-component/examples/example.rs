@@ -38,7 +38,7 @@ trait Drawable {
 async fn run(mut component: impl AsyncComponent + Drawable) {
     loop {
         let flag = component.next().await;
-        
+
         // Redraw since last render is invalid
         if flag.contains(ComponentPollFlags::STATE) {
             component.draw();
