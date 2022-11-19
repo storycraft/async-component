@@ -1,14 +1,83 @@
 #![doc = "../readme.md"]
 
-pub use async_component_macro::Component;
-
 #[doc(hidden)]
 #[path = "exports.rs"]
 pub mod __private;
 
-use std::ops::{Deref, DerefMut};
+pub use async_component_macro::AsyncComponent;
+
+use futures_core::{Future, Stream};
+
+use std::{
+    ops::{Deref, DerefMut},
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use bitflags::bitflags;
+
+pub trait AsyncComponent: Unpin {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags>;
+}
+
+impl<T: AsyncComponent> AsyncComponent for Option<T> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
+        match self.as_pin_mut() {
+            Some(inner) => inner.poll_next(cx),
+            None => Poll::Pending,
+        }
+    }
+}
+
+impl<T: AsyncComponent> AsyncComponent for Box<T> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
+        T::poll_next(Pin::new(&mut *self), cx)
+    }
+}
+
+impl<T: AsyncComponent> AsyncComponent for &mut T {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
+        Pin::new(&mut **self).poll_next(cx)
+    }
+}
+
+pub trait AsyncComponentExt {
+    fn next(&mut self) -> Next<Self>;
+
+    fn into_stream(self) -> AsyncComponentStream<Self>;
+}
+
+impl<T: AsyncComponent> AsyncComponentExt for T {
+    fn next(&mut self) -> Next<Self> {
+        Next(self)
+    }
+
+    fn into_stream(self) -> AsyncComponentStream<Self> {
+        AsyncComponentStream(self)
+    }
+}
+
+#[derive(Debug)]
+pub struct Next<'a, T: ?Sized>(&'a mut T);
+
+impl<T: AsyncComponent> Future for Next<'_, T> {
+    type Output = ComponentPollFlags;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut *self.0).poll_next(cx)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AsyncComponentStream<T: ?Sized>(T);
+
+impl<T: AsyncComponent> Stream for AsyncComponentStream<T> {
+    type Item = ComponentPollFlags;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.0).poll_next(cx).map(Some)
+    }
+}
 
 #[derive(Debug)]
 pub struct StateCell<T> {

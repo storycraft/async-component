@@ -1,5 +1,5 @@
 # Async component
-Zero overhead reactive programming using async iterator (stream)
+Zero overhead reactive programming
 
 The current goal is composing gui components easily without performance degrade in Rust.
 
@@ -8,7 +8,7 @@ UI components are retained. It only need to recalculate some layout when propert
 
 States are never updated unless some event occur from outside.
 
-Using stream, we can poll for events from outside and apply update of changed value simultaneously.
+Using stream like structure, we can poll for events from outside and apply update of changed value simultaneously.
 
 ## Example
 See `async_component/examples/example.rs` for simple example.
@@ -17,9 +17,9 @@ See `examples/gui-demo` project for example using with gui(winit, raqote, pixels
 
 ### Code
 ```Rust
-use async_component::Component;
+use async_component::AsyncComponent;
 
-#[derive(Debug, Component)]
+#[derive(Debug, AsyncComponent)]
 struct CounterComponent {
     // State must be wrapped with StateCell
     #[state(Self::on_counter_update)]
@@ -50,12 +50,10 @@ Counter updated to: ...
 ```
 
 ### Expanded
-`Component` derive macro will generate `Stream` trait implementation for `CounterComponent` like below.
+`Component` derive macro will generate `AsyncComponent` trait implementation for `CounterComponent` like below.
 ```Rust
-impl Stream for CounterComponent {
-    type Item = ComponentPollFlags;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+impl AsyncComponent for CounterComponent {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
         let mut result = ComponentPollFlags::empty();
 
         if StateCell::poll_changed(
@@ -74,7 +72,7 @@ impl Stream for CounterComponent {
         if result.is_empty() {
             Poll::Pending
         } else {
-            Poll::Ready(Some(result))
+            Poll::Ready(result)
         }
     }
 }

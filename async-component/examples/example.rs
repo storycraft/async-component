@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use async_component::{Component, ComponentPollFlags, StateCell};
+use async_component::{AsyncComponent, AsyncComponentExt, ComponentPollFlags, StateCell};
 use futures::{
     channel::mpsc::{channel, Receiver},
-    pin_mut, SinkExt, Stream, StreamExt,
+    SinkExt,
 };
 use tokio::time::sleep;
 
@@ -35,10 +35,10 @@ trait Drawable {
     fn draw(&self);
 }
 
-async fn run(component: impl Stream<Item = ComponentPollFlags> + Drawable) {
-    pin_mut!(component);
-
-    while let Some(flag) = component.next().await {
+async fn run(mut component: impl AsyncComponent + Drawable) {
+    loop {
+        let flag = component.next().await;
+        
         // Redraw since last render is invalid
         if flag.contains(ComponentPollFlags::STATE) {
             component.draw();
@@ -46,7 +46,7 @@ async fn run(component: impl Stream<Item = ComponentPollFlags> + Drawable) {
     }
 }
 
-#[derive(Debug, Component)]
+#[derive(Debug, AsyncComponent)]
 struct CounterComponent {
     #[state]
     pub counter: StateCell<i32>,
@@ -60,7 +60,7 @@ impl Drawable for CounterComponent {
     }
 }
 
-#[derive(Debug, Component)]
+#[derive(Debug, AsyncComponent)]
 // Called if any states are updated
 #[component(Self::update)]
 struct LoginForm {

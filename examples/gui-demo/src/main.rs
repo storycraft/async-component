@@ -1,9 +1,9 @@
 use std::thread;
 
-use async_component::{Component, ComponentPollFlags, StateCell};
+use async_component::{AsyncComponent, AsyncComponentExt, ComponentPollFlags, StateCell};
 use futures::{
     channel::mpsc::{channel, Receiver},
-    pin_mut, SinkExt, Stream, StreamExt,
+    SinkExt,
 };
 use pixels::{Pixels, SurfaceTexture};
 use raqote::{DrawOptions, DrawTarget, SolidSource, Source};
@@ -33,12 +33,16 @@ fn main() {
         pixels
     };
 
-    let (mut sender, recv) = channel(10000);
+    let (mut sender, recv) = channel(1000);
 
     thread::spawn(move || {
-        futures::executor::block_on(async move {
-            let app = App::new(recv);
-            run(pixels, window_size.into(), app).await;
+        let app = App::new();
+        let mut container = Container::new(pixels, window_size.into(), recv, app);
+
+        futures::executor::block_on(async {
+            loop {
+                container.next().await;
+            }
         });
     });
 
@@ -57,20 +61,17 @@ trait AppElement {
     fn on_event(&mut self, _: &Event<()>) {}
 }
 
-#[derive(Component)]
+#[derive(AsyncComponent)]
 pub struct App {
     #[component]
     center_box: Square,
 
     #[component]
     cursor: Square,
-
-    #[stream(Self::on_event)]
-    event_recv: Receiver<Event<'static, ()>>,
 }
 
 impl App {
-    pub fn new(event_recv: Receiver<Event<'static, ()>>) -> Self {
+    pub fn new() -> Self {
         Self {
             center_box: Square::new(
                 (100.0, 100.0),
@@ -92,13 +93,7 @@ impl App {
                     a: 0xff,
                 }),
             ),
-            event_recv,
         }
-    }
-
-    // This is ok. However when using top-down propagated global events like this, consider calling [`AppElement::onevent`] on [`run`] method for more efficiency.
-    fn on_event(&mut self, event: Event<()>) {
-        <Self as AppElement>::on_event(self, &event);
     }
 }
 
@@ -122,7 +117,7 @@ impl AppElement for App {
     }
 }
 
-#[derive(Component)]
+#[derive(AsyncComponent)]
 pub struct Square {
     #[state]
     pub position: StateCell<(f32, f32)>,
@@ -156,21 +151,41 @@ impl AppElement for Square {
         );
     }
 }
-
-async fn run(
-    mut pixels: Pixels,
+#[derive(AsyncComponent)]
+struct Container<T: AppElement + AsyncComponent> {
+    pixels: Pixels,
     win_size: (f32, f32),
-    component: impl Stream<Item = ComponentPollFlags> + AppElement,
-) {
-    pin_mut!(component);
 
-    while let Some(flag) = component.next().await {
+    #[stream(Self::on_event)]
+    event_recv: Receiver<Event<'static, ()>>,
+
+    #[component(Self::on_update)]
+    component: T,
+}
+
+impl<T: AppElement + AsyncComponent> Container<T> {
+    pub fn new(
+        pixels: Pixels,
+        win_size: (f32, f32),
+        event_recv: Receiver<Event<'static, ()>>,
+        component: T,
+    ) -> Self {
+        Self {
+            pixels,
+            win_size,
+            event_recv,
+            component,
+        }
+    }
+
+    fn on_update(&mut self, flag: ComponentPollFlags) {
         if flag.contains(ComponentPollFlags::STATE) {
-            let mut target = DrawTarget::new(win_size.0 as _, win_size.1 as _);
+            let mut target = DrawTarget::new(self.win_size.0 as _, self.win_size.1 as _);
 
-            component.draw(&mut target);
+            self.component.draw(&mut target);
 
-            for (dst, &src) in pixels
+            for (dst, &src) in self
+                .pixels
                 .get_frame_mut()
                 .chunks_exact_mut(4)
                 .zip(target.get_data().iter())
@@ -181,7 +196,11 @@ async fn run(
                 dst[3] = (src >> 24) as u8;
             }
 
-            pixels.render().unwrap();
+            self.pixels.render().unwrap();
         }
+    }
+
+    fn on_event(&mut self, event: Event<()>) {
+        self.component.on_event(&event);
     }
 }

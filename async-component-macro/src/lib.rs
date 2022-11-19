@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned, IdentFragment};
 use syn::{parse_macro_input, Attribute, Data, DeriveInput, ExprPath, Fields, Ident, Index};
 
-#[proc_macro_derive(Component, attributes(component, state, stream))]
+#[proc_macro_derive(AsyncComponent, attributes(component, state, stream))]
 pub fn component_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -57,13 +57,11 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
     };
 
     quote! {
-        impl #impl_generics ::async_component::__private::Stream for #name #ty_generics #where_clause {
-            type Item = ::async_component::ComponentPollFlags;
-
+        impl #impl_generics ::async_component::AsyncComponent for #name #ty_generics #where_clause {
             fn poll_next(
                 mut self: ::std::pin::Pin<&mut Self>,
                 cx: &mut ::std::task::Context<'_>
-            ) -> ::std::task::Poll<Option<Self::Item>> {
+            ) -> ::std::task::Poll<::async_component::ComponentPollFlags> {
                 let mut result = ::async_component::ComponentPollFlags::empty();
 
                 #poll_next_body
@@ -71,7 +69,7 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
                 if result.is_empty() {
                     ::std::task::Poll::Pending
                 } else {
-                    ::std::task::Poll::Ready(Some(result))
+                    ::std::task::Poll::Ready(result)
                 }
             }
         }
@@ -177,10 +175,10 @@ fn field_component_stream_poll_body(
     let method_call = method_name.map(|path| quote! { #path(&mut self, recv); });
 
     quote_spanned! { name.span() =>
-        if let ::std::task::Poll::Ready(Some(recv))
-            = ::futures::Stream::poll_next(::std::pin::Pin::new(&mut self.#name), cx) {
+        if let ::std::task::Poll::Ready(recv)
+            = ::async_component::AsyncComponent::poll_next(::std::pin::Pin::new(&mut self.#name), cx) {
             #method_call
-            result |= recv | ::async_component::ComponentPollFlags::STREAM;
+            result |= recv;
         }
     }
 }
@@ -236,7 +234,7 @@ fn field_sub_stream_stream_poll_body(
 
     quote_spanned! { name.span() =>
         while let ::std::task::Poll::Ready(Some(#recv_item))
-            = ::futures::Stream::poll_next(::std::pin::Pin::new(&mut self.#name), cx) {
+            = ::async_component::__private::Stream::poll_next(::std::pin::Pin::new(&mut self.#name), cx) {
             #method_call
             result |= ::async_component::ComponentPollFlags::STREAM;
         }
