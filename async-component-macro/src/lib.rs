@@ -121,9 +121,10 @@ fn field_state_stream_poll_body(
     let method_call = method_name.map(|path| quote! { #path(&mut self); });
 
     quote_spanned! { name.span() =>
-        if ::async_component::StateCell::refresh(
-            &mut self.#name
-        ) {
+        if ::async_component::StateCell::poll_changed(
+            ::std::pin::Pin::new(&mut self.#name),
+            cx
+        ).is_ready() {
             #method_call
             result |= ::async_component::ComponentPollFlags::STATE;
         }

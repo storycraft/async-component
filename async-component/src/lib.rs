@@ -11,7 +11,7 @@ use futures_core::{Future, Stream};
 use std::{
     ops::{Deref, DerefMut},
     pin::Pin,
-    task::{Context, Poll},
+    task::{Context, Poll, Waker},
 };
 
 use bitflags::bitflags;
@@ -93,20 +93,32 @@ impl<T> StateCell<T> {
         }
     }
 
-    pub fn invalidate(this: &mut Self) {
-        if let StateStatus::None = this.status {
-            this.status = StateStatus::Changed;
+    pub fn set_changed(this: &mut Self) {
+        match this.status {
+            StateStatus::None => this.status = StateStatus::Changed,
+
+            StateStatus::Pending(ref waker) => {
+                waker.wake_by_ref();
+
+                this.status = StateStatus::Changed;
+            }
+
+            StateStatus::Changed => {}
         }
     }
 
-    pub fn refresh(mut this: &mut Self) -> bool {
+    pub fn poll_changed(this: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        // SAFETY: Fields in StateCell is never considered pinned
         match this.status {
-            StateStatus::None => false,
+            StateStatus::None | StateStatus::Pending(_) => {
+                unsafe { this.get_unchecked_mut().status = StateStatus::Pending(cx.waker().clone()); }
+
+                Poll::Pending
+            }
 
             StateStatus::Changed => {
-                this.status = StateStatus::None;
-
-                true
+                unsafe { this.get_unchecked_mut().status = StateStatus::None; }
+                Poll::Ready(())
             }
         }
     }
@@ -122,7 +134,7 @@ impl<T> Deref for StateCell<T> {
 
 impl<T> DerefMut for StateCell<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        StateCell::invalidate(self);
+        StateCell::set_changed(self);
 
         &mut self.inner
     }
@@ -134,9 +146,13 @@ impl<T> From<T> for StateCell<T> {
     }
 }
 
+/// Unpin: Fields in StateCell are never structurally pinned
+impl<T> Unpin for StateCell<T> {}
+
 #[derive(Debug, Clone)]
 enum StateStatus {
     None,
+    Pending(Waker),
     Changed,
 }
 
