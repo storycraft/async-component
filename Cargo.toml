@@ -5,5 +5,7 @@ members = [
     "async-component",
     "async-component-macro",
     
+    "async-component-winit",
+
     "examples/*"
 ]
