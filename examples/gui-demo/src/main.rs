@@ -1,64 +1,27 @@
-use std::thread;
+mod env;
 
-use async_component::{AsyncComponent, AsyncComponentExt, ComponentPollFlags, StateCell};
-use futures::{
-    channel::mpsc::{channel, Receiver},
-    SinkExt,
-};
-use pixels::{Pixels, SurfaceTexture};
+use async_component::{AsyncComponent, StateCell};
+use env::{AppElement, AppContainer};
 use raqote::{DrawOptions, DrawTarget, SolidSource, Source};
 use winit::{
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoopBuilder,
     window::WindowBuilder,
 };
 
 fn main() {
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoopBuilder::with_user_event().build();
 
     let window = WindowBuilder::new()
         .with_title("Async component GUI demo")
-        .with_resizable(false)
         .build(&event_loop)
         .unwrap();
 
     window.set_cursor_visible(false);
 
-    let window_size = window.inner_size();
+    let app = App::new();
 
-    let pixels = {
-        let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-        let pixels = Pixels::new(window_size.width, window_size.height, surface_texture).unwrap();
-
-        pixels
-    };
-
-    let (mut sender, recv) = channel(1000);
-
-    thread::spawn(move || {
-        let app = App::new();
-        let mut container = Container::new(pixels, window_size.into(), recv, app);
-
-        futures::executor::block_on(async {
-            loop {
-                container.next().await;
-            }
-        });
-    });
-
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
-
-        if let Some(event) = event.to_static() {
-            futures::executor::block_on(sender.send(event)).ok();
-        }
-    });
-}
-
-trait AppElement {
-    fn draw(&self, target: &mut DrawTarget);
-
-    fn on_event(&mut self, _: &Event<()>) {}
+    async_component_winit::run(event_loop, AppContainer::new(window, app));
 }
 
 #[derive(AsyncComponent)]
@@ -149,58 +112,5 @@ impl AppElement for Square {
             &self.source,
             &DrawOptions::default(),
         );
-    }
-}
-#[derive(AsyncComponent)]
-struct Container<T: AppElement + AsyncComponent> {
-    pixels: Pixels,
-    win_size: (f32, f32),
-
-    #[stream(Self::on_event)]
-    event_recv: Receiver<Event<'static, ()>>,
-
-    #[component(Self::on_update)]
-    component: T,
-}
-
-impl<T: AppElement + AsyncComponent> Container<T> {
-    pub fn new(
-        pixels: Pixels,
-        win_size: (f32, f32),
-        event_recv: Receiver<Event<'static, ()>>,
-        component: T,
-    ) -> Self {
-        Self {
-            pixels,
-            win_size,
-            event_recv,
-            component,
-        }
-    }
-
-    fn on_update(&mut self, flag: ComponentPollFlags) {
-        if flag.contains(ComponentPollFlags::STATE) {
-            let mut target = DrawTarget::new(self.win_size.0 as _, self.win_size.1 as _);
-
-            self.component.draw(&mut target);
-
-            for (dst, &src) in self
-                .pixels
-                .get_frame_mut()
-                .chunks_exact_mut(4)
-                .zip(target.get_data().iter())
-            {
-                dst[0] = (src >> 16) as u8;
-                dst[1] = (src >> 8) as u8;
-                dst[2] = src as u8;
-                dst[3] = (src >> 24) as u8;
-            }
-
-            self.pixels.render().unwrap();
-        }
-    }
-
-    fn on_event(&mut self, event: Event<()>) {
-        self.component.on_event(&event);
     }
 }
