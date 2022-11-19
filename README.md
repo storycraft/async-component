@@ -56,10 +56,9 @@ impl AsyncComponent for CounterComponent {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
         let mut result = ComponentPollFlags::empty();
 
-        if StateCell::poll_changed(
-            Pin::new(&mut self.counter),
-            cx
-        ).is_ready() {
+        if StateCell::refresh(
+            &mut self.counter
+        ) {
             Self::on_counter_update(&mut self);
             result |= ComponentPollFlags::STATE;
         }
