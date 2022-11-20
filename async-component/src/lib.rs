@@ -20,13 +20,13 @@ pub trait AsyncComponent: Unpin {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags>;
 }
 
-impl<T: AsyncComponent> AsyncComponent for Box<T> {
+impl<T: ?Sized + AsyncComponent> AsyncComponent for Box<T> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
         T::poll_next(Pin::new(&mut *self), cx)
     }
 }
 
-impl<T: AsyncComponent> AsyncComponent for &mut T {
+impl<T: ?Sized + AsyncComponent> AsyncComponent for &mut T {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
         Pin::new(&mut **self).poll_next(cx)
     }
