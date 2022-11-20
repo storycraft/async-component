@@ -25,6 +25,8 @@ pub fn run(
 
     let executor = WinitExecutor::new(event_loop.create_proxy());
 
+    let mut should_repoll = false;
+
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_wait();
 
@@ -32,12 +34,22 @@ pub fn run(
             Event::RedrawEventsCleared => {
                 component.on_event(Event::RedrawEventsCleared, control_flow);
 
-                if let Poll::Ready(_) = executor.poll_component(Pin::new(&mut component)) {
-                    if let ControlFlow::ExitWithCode(_) = control_flow {
-                        return;
-                    }
+                if let ControlFlow::ExitWithCode(_) = control_flow {
+                    return;
+                }
+
+                if should_repoll {
+                    should_repoll = false;
 
                     control_flow.set_poll();
+                }
+            }
+
+            Event::MainEventsCleared => {
+                component.on_event(Event::MainEventsCleared, control_flow);
+
+                if let Poll::Ready(_) = executor.poll_component(Pin::new(&mut component)) {
+                    should_repoll = true;
                 }
             }
 
