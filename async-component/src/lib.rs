@@ -126,6 +126,12 @@ impl<T> From<T> for StateCell<T> {
     }
 }
 
+impl<T: Default> Default for StateCell<T> {
+    fn default() -> Self {
+        Self::new(Default::default())
+    }
+}
+
 #[derive(Debug, Clone)]
 enum StateStatus {
     None,
