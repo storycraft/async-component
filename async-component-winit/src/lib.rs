@@ -1,19 +1,12 @@
-pub mod waker;
+pub mod executor;
 
-use std::{
-    pin::Pin,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    task::{Context, Poll, Waker},
-};
+use std::{pin::Pin, task::Poll};
 
-use async_component::{AsyncComponent, ComponentPollFlags};
-use waker::create_waker;
+use async_component::AsyncComponent;
+use executor::WinitExecutor;
 use winit::{
     event::Event,
-    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
+    event_loop::{ControlFlow, EventLoop},
 };
 
 pub trait WinitComponent {
@@ -23,33 +16,6 @@ pub trait WinitComponent {
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub struct ExecutorPollEvent;
-
-#[derive(Debug)]
-struct WinitExecutor {
-    scheduled: Arc<AtomicBool>,
-
-    waker: Waker,
-}
-
-impl WinitExecutor {
-    pub fn new(proxy: EventLoopProxy<ExecutorPollEvent>) -> Self {
-        let scheduled = Arc::new(AtomicBool::new(false));
-
-        let waker = create_waker(scheduled.clone(), proxy);
-
-        Self { scheduled, waker }
-    }
-
-    pub fn poll_component(
-        &self,
-        component: Pin<&mut impl AsyncComponent>,
-    ) -> Poll<ComponentPollFlags> {
-        let _ = self
-            .scheduled
-            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire);
-        component.poll_next(&mut Context::from_waker(&self.waker))
-    }
-}
 
 pub fn run(
     event_loop: EventLoop<ExecutorPollEvent>,
