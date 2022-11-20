@@ -42,7 +42,9 @@ pub fn run(
             }
 
             // Event::RedrawEventsCleared
-            Event::UserEvent(_) => {}
+            Event::UserEvent(_) => {
+                control_flow.set_poll();
+            }
 
             _ => {
                 component.on_event(event.map_nonuser_event().unwrap(), control_flow);
