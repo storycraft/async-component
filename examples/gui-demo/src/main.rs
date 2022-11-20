@@ -1,6 +1,6 @@
 mod env;
 
-use async_component::{AsyncComponent, StateCell, ComponentPollFlags};
+use async_component::{AsyncComponent, StateCell};
 use env::{AppContainer, AppElement};
 use raqote::{DrawOptions, DrawTarget, SolidSource, Source};
 use winit::{
