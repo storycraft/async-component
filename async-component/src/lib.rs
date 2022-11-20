@@ -70,6 +70,8 @@ impl<T: AsyncComponent> Stream for AsyncComponentStream<T> {
     }
 }
 
+pub type PhantomState = StateCell<()>;
+
 #[derive(Debug)]
 pub struct StateCell<T> {
     status: StateStatus,
