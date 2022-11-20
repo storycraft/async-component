@@ -6,14 +6,14 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    task::{Context, Poll},
+    task::{Context, Poll, Waker},
 };
 
-use async_component::AsyncComponent;
+use async_component::{AsyncComponent, ComponentPollFlags};
 use waker::create_waker;
 use winit::{
     event::Event,
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
 };
 
 pub trait WinitComponent {
@@ -24,36 +24,59 @@ pub trait WinitComponent {
 #[non_exhaustive]
 pub struct ExecutorPollEvent;
 
+#[derive(Debug)]
+struct WinitExecutor {
+    scheduled: Arc<AtomicBool>,
+
+    waker: Waker,
+}
+
+impl WinitExecutor {
+    pub fn new(proxy: EventLoopProxy<ExecutorPollEvent>) -> Self {
+        let scheduled = Arc::new(AtomicBool::new(false));
+
+        let waker = create_waker(scheduled.clone(), proxy);
+
+        Self { scheduled, waker }
+    }
+
+    pub fn poll_component(
+        &self,
+        component: Pin<&mut impl AsyncComponent>,
+    ) -> Poll<ComponentPollFlags> {
+        let _ = self
+            .scheduled
+            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire);
+        component.poll_next(&mut Context::from_waker(&self.waker))
+    }
+}
+
 pub fn run(
     event_loop: EventLoop<ExecutorPollEvent>,
     component: impl AsyncComponent + WinitComponent + 'static,
 ) -> ! {
     let mut component = component;
 
-    let scheduled = Arc::new(AtomicBool::new(false));
-
-    let proxy = event_loop.create_proxy();
-
-    let waker = create_waker(scheduled.clone(), proxy.clone());
+    let executor = WinitExecutor::new(event_loop.create_proxy());
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        control_flow.set_wait();
 
         match event {
-            Event::MainEventsCleared => {
-                component.on_event(Event::MainEventsCleared, control_flow);
+            Event::RedrawEventsCleared => {
+                component.on_event(Event::RedrawEventsCleared, control_flow);
 
-                if let Poll::Ready(_) =
-                    Pin::new(&mut component).poll_next(&mut Context::from_waker(&waker))
-                {
-                    proxy.send_event(ExecutorPollEvent).ok();
+                if let Poll::Ready(_) = executor.poll_component(Pin::new(&mut component)) {
+                    if let ControlFlow::ExitWithCode(_) = control_flow {
+                        return;
+                    }
+
+                    control_flow.set_poll();
                 }
             }
 
-            // Event::MainEventsCleared called after this event
-            Event::UserEvent(_) => {
-                let _ = scheduled.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire);
-            }
+            // Event::RedrawEventsCleared
+            Event::UserEvent(_) => {}
 
             _ => {
                 component.on_event(event.map_nonuser_event().unwrap(), control_flow);
