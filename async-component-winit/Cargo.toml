@@ -1,8 +1,11 @@
 [package]
 name = "async-component-winit"
 description = "winit async-component wrapper"
-version = "0.2.4"
+keywords = ["winit", "async-component"]
+categories = ["asynchronous"]
+version = "0.2.5"
 edition = "2021"
+readme = "README.md"
 
 authors = [
     "storycraft <storycraft@pancake.sh>"

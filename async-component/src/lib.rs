@@ -1,4 +1,4 @@
-#![doc = "../readme.md"]
+#![doc = "../README.md"]
 
 #[doc(hidden)]
 #[path = "exports.rs"]
