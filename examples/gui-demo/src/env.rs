@@ -90,7 +90,7 @@ impl<T: AppElement + AsyncComponent> WinitComponent for AppContainer<T> {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
-            } => *control_flow = ControlFlow::Exit,
+            } => control_flow.set_exit(),
 
             _ => {}
         }
