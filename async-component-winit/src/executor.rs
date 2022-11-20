@@ -1,9 +1,10 @@
 use std::{
+    pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    task::{Wake, Waker, Poll, Context}, pin::Pin,
+    task::{Context, Poll, Wake, Waker},
 };
 
 use async_component::{AsyncComponent, ComponentPollFlags};
@@ -14,37 +15,43 @@ use crate::ExecutorPollEvent;
 
 #[derive(Debug)]
 pub struct WinitExecutor {
-    scheduled: Arc<AtomicBool>,
-
+    signal: Arc<WinitSignal>,
     waker: Waker,
 }
 
 impl WinitExecutor {
     pub fn new(proxy: EventLoopProxy<ExecutorPollEvent>) -> Self {
-        let scheduled = Arc::new(AtomicBool::new(false));
+        let signal = Arc::new(WinitSignal {
+            scheduled: AtomicBool::new(false),
+            proxy: Mutex::new(proxy),
+        });
 
-        let waker = create_waker(scheduled.clone(), proxy);
+        let waker = Waker::from(signal.clone());
 
-        Self { scheduled, waker }
+        Self { signal, waker }
     }
 
     pub fn poll_component(
         &self,
         component: Pin<&mut impl AsyncComponent>,
     ) -> Poll<ComponentPollFlags> {
-        let _ = self
-            .scheduled
-            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire);
+        let _ = self.signal.scheduled.compare_exchange(
+            true,
+            false,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        );
         component.poll_next(&mut Context::from_waker(&self.waker))
     }
 }
 
-struct WinitWaker {
-    scheduled: Arc<AtomicBool>,
+#[derive(Debug)]
+struct WinitSignal {
+    scheduled: AtomicBool,
     proxy: Mutex<EventLoopProxy<ExecutorPollEvent>>,
 }
 
-impl Wake for WinitWaker {
+impl Wake for WinitSignal {
     fn wake(self: Arc<Self>) {
         self.wake_by_ref()
     }
@@ -57,11 +64,4 @@ impl Wake for WinitWaker {
             self.proxy.lock().send_event(ExecutorPollEvent).ok();
         }
     }
-}
-
-fn create_waker(scheduled: Arc<AtomicBool>, proxy: EventLoopProxy<ExecutorPollEvent>) -> Waker {
-    Waker::from(Arc::new(WinitWaker {
-        scheduled,
-        proxy: Mutex::new(proxy),
-    }))
 }
