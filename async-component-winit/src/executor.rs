@@ -65,3 +65,11 @@ impl Wake for WinitSignal {
         }
     }
 }
+
+
+// SAFETY: There is no thread in wasm
+#[cfg(target_arch = "wasm32")]
+unsafe impl Send for WinitSignal {}
+
+#[cfg(target_arch = "wasm32")]
+unsafe impl Sync for WinitSignal {}
