@@ -77,6 +77,12 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
 }
 
 fn state_stream_poll_body(fields: &Fields) -> TokenStream {
+    if fields.is_empty() {
+        return quote! {
+            compile_error!("A component must have states. Add PhantomState for placeholder.");
+        }
+    }
+
     match fields {
         Fields::Named(fields) => {
             let iter = fields.named.iter().filter_map(|field| {
