@@ -1,6 +1,6 @@
 mod env;
 
-use async_component::{AsyncComponent, PhantomState, StateCell};
+use async_component::{AsyncComponent, StateCell};
 use env::{AppContainer, AppElement};
 use raqote::{DrawOptions, DrawTarget, SolidSource, Source};
 use winit::{
@@ -31,9 +31,6 @@ pub struct App {
 
     #[component]
     cursor: Square,
-
-    #[state]
-    _phantom: PhantomState,
 }
 
 impl App {
@@ -59,8 +56,6 @@ impl App {
                     a: 0xff,
                 }),
             ),
-
-            _phantom: Default::default(),
         }
     }
 }
