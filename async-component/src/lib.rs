@@ -70,6 +70,8 @@ impl<T: AsyncComponent> Stream for AsyncComponentStream<T> {
     }
 }
 
+pub type PhantomState = StateCell<()>;
+
 #[derive(Debug)]
 pub struct StateCell<T> {
     status: StateStatus,
@@ -99,12 +101,6 @@ impl<T> StateCell<T> {
 
             _ => false,
         }
-    }
-}
-
-impl StateCell<()> {
-    pub fn touch(&mut self) {
-        Self::invalidate(self);
     }
 }
 

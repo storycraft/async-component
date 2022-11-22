@@ -1,4 +1,4 @@
-use async_component::{AsyncComponent, ComponentPollFlags};
+use async_component::{AsyncComponent, ComponentPollFlags, PhantomState};
 use async_component_winit::WinitComponent;
 use pixels::{Pixels, SurfaceTexture};
 use raqote::DrawTarget;
@@ -21,7 +21,10 @@ pub struct AppContainer<T: AppElement + AsyncComponent> {
     pixels: Pixels,
 
     #[component(Self::on_update)]
-    component: T
+    component: T,
+
+    #[state]
+    _phantom: PhantomState,
 }
 
 impl<T: AppElement + AsyncComponent> AppContainer<T> {
@@ -40,7 +43,8 @@ impl<T: AppElement + AsyncComponent> AppContainer<T> {
         Self {
             window,
             pixels,
-            component
+            component,
+            _phantom: Default::default(),
         }
     }
 
