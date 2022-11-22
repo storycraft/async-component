@@ -75,7 +75,6 @@ impl AppElement for App {
             ..
         } = event
         {
-            // Do not set StateCell directly as it will not wake task
             *self.cursor.position = (position.x as _, position.y as _);
         }
     }
