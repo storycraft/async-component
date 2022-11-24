@@ -6,37 +6,33 @@ use std::{
 
 use async_component::{AsyncComponent, ComponentPollFlags};
 
-pub struct SuspenseComponent<Fallback, Component> {
-    current: SuspenseVariant<Fallback, Component>,
-}
+pub struct SuspenseComponent<Fallback, Component>(SuspenseVariant<Fallback, Component>);
 
 impl<F: AsyncComponent, C: AsyncComponent> SuspenseComponent<F, C> {
     pub fn new(fallback: F, fut: impl Future<Output = C> + 'static) -> Self {
-        Self {
-            current: SuspenseVariant::Loading {
-                fallback,
-                fut: Box::pin(fut),
-            },
-        }
+        Self(SuspenseVariant::Loading {
+            fallback,
+            fut: Box::pin(fut),
+        })
     }
 
     pub const fn is_ready(&self) -> bool {
-        matches!(self.current, SuspenseVariant::Ready { .. })
+        matches!(self.0, SuspenseVariant::Ready { .. })
     }
 
     pub const fn is_loading(&self) -> bool {
-        matches!(self.current, SuspenseVariant::Loading { .. })
+        matches!(self.0, SuspenseVariant::Loading { .. })
     }
 
     pub const fn get(&self) -> Result<&C, &F> {
-        match self.current {
+        match self.0 {
             SuspenseVariant::Loading { ref fallback, .. } => Err(fallback),
             SuspenseVariant::Ready(ref component) => Ok(component),
         }
     }
 
     pub fn get_mut(&mut self) -> Result<&mut C, &mut F> {
-        match self.current {
+        match self.0 {
             SuspenseVariant::Loading {
                 ref mut fallback, ..
             } => Err(fallback),
@@ -47,13 +43,13 @@ impl<F: AsyncComponent, C: AsyncComponent> SuspenseComponent<F, C> {
 
 impl<F: AsyncComponent, C: AsyncComponent> AsyncComponent for SuspenseComponent<F, C> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
-        if let SuspenseVariant::Loading { ref mut fut, .. } = self.current {
+        if let SuspenseVariant::Loading { ref mut fut, .. } = self.0 {
             if let Poll::Ready(component) = Pin::new(fut).poll(cx) {
-                self.current = SuspenseVariant::Ready(component);
+                self.0 = SuspenseVariant::Ready(component);
             }
         }
 
-        match self.current {
+        match self.0 {
             SuspenseVariant::Loading {
                 ref mut fallback, ..
             } => Pin::new(fallback).poll_next(cx),
