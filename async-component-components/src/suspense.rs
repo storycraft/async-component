@@ -21,7 +21,7 @@ impl<F: AsyncComponent, C: AsyncComponent> SuspenseComponent<F, C> {
     }
 
     pub const fn is_ready(&self) -> bool {
-        matches!(self.current, SuspenseVariant::Loaded { .. })
+        matches!(self.current, SuspenseVariant::Ready { .. })
     }
 
     pub const fn is_loading(&self) -> bool {
@@ -31,7 +31,7 @@ impl<F: AsyncComponent, C: AsyncComponent> SuspenseComponent<F, C> {
     pub const fn get(&self) -> Result<&C, &F> {
         match self.current {
             SuspenseVariant::Loading { ref fallback, .. } => Err(fallback),
-            SuspenseVariant::Loaded(ref component) => Ok(component),
+            SuspenseVariant::Ready(ref component) => Ok(component),
         }
     }
 
@@ -40,7 +40,7 @@ impl<F: AsyncComponent, C: AsyncComponent> SuspenseComponent<F, C> {
             SuspenseVariant::Loading {
                 ref mut fallback, ..
             } => Err(fallback),
-            SuspenseVariant::Loaded(ref mut component) => Ok(component),
+            SuspenseVariant::Ready(ref mut component) => Ok(component),
         }
     }
 }
@@ -49,7 +49,7 @@ impl<F: AsyncComponent, C: AsyncComponent> AsyncComponent for SuspenseComponent<
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
         if let SuspenseVariant::Loading { ref mut fut, .. } = self.current {
             if let Poll::Ready(component) = Pin::new(fut).poll(cx) {
-                self.current = SuspenseVariant::Loaded(component);
+                self.current = SuspenseVariant::Ready(component);
             }
         }
 
@@ -58,7 +58,7 @@ impl<F: AsyncComponent, C: AsyncComponent> AsyncComponent for SuspenseComponent<
                 ref mut fallback, ..
             } => Pin::new(fallback).poll_next(cx),
 
-            SuspenseVariant::Loaded(ref mut component) => Pin::new(component).poll_next(cx),
+            SuspenseVariant::Ready(ref mut component) => Pin::new(component).poll_next(cx),
         }
     }
 }
@@ -68,5 +68,5 @@ enum SuspenseVariant<Fallback, Component> {
         fallback: Fallback,
         fut: Pin<Box<dyn Future<Output = Component>>>,
     },
-    Loaded(Component),
+    Ready(Component),
 }
