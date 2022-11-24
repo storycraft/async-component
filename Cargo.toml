@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "async-component",
+    "async-component-components",
     "async-component-macro",
     
     "async-component-winit",
