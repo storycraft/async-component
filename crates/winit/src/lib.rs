@@ -2,7 +2,7 @@
 
 pub mod executor;
 
-use std::pin::Pin;
+use std::{pin::Pin, task::Poll};
 
 use async_component_core::AsyncComponent;
 use executor::WinitExecutor;
@@ -28,29 +28,28 @@ pub fn run(
     let executor = WinitExecutor::new(event_loop.create_proxy());
 
     event_loop.run(move |event, _, control_flow| match event {
-        Event::RedrawEventsCleared => {
-            component.on_event(Event::RedrawEventsCleared, control_flow);
+        Event::MainEventsCleared => {
+            component.on_event(Event::MainEventsCleared, control_flow);
 
             if let ControlFlow::ExitWithCode(_) = control_flow {
                 return;
             }
 
-            if executor
-                .poll_component(Pin::new(&mut component))
-                .is_pending()
-            {
-                control_flow.set_wait();
+            match executor.poll_component(Pin::new(&mut component)) {
+                Poll::Ready(_) => {
+                    control_flow.set_poll();
+                }
+                Poll::Pending => {
+                    control_flow.set_wait();
+                }
             }
         }
 
-        Event::UserEvent(_) => {
-            let _ = executor.poll_component(Pin::new(&mut component));
-        }
+        // Event::RedrawEventsCleared
+        Event::UserEvent(_) => {}
 
         _ => {
             component.on_event(event.map_nonuser_event().unwrap(), control_flow);
-
-            let _ = executor.poll_component(Pin::new(&mut component));
         }
     });
 }

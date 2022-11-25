@@ -2,5 +2,5 @@
 Async executor for `async-component` on winit event loop
 
 ## Implementation detail
-1. Event -> Executor poll -> ... -> RedrawEventsCleared -> Executor poll -> winit poll (if last executor poll was Poll::Ready)
-2. Waker::wake -> UserEvent(ExecutorPollEvent) -> Executor poll -> ... -> RedrawEventsCleared -> Executor poll -> winit poll (if last executor poll was Poll::Ready)
+1. Waker::wake -> UserEvent(ExecutorPollEvent) -> MainEventsCleared -> Executor poll -> RedrawEventsCleared -> winit poll (only if last executor poll was Poll::Ready)
+2. Events -> MainEventsCleared -> Executor poll -> RedrawEventsCleared -> winit poll (only if last executor poll was Poll::Ready)
