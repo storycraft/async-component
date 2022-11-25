@@ -5,7 +5,7 @@ use std::{
     vec, slice,
 };
 
-use async_component::{AsyncComponent, ComponentPollFlags, StateCell};
+use async_component_core::{AsyncComponent, ComponentPollFlags, StateCell};
 
 #[derive(Debug)]
 pub struct VecComponent<T> {

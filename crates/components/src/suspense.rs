@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use async_component::{AsyncComponent, ComponentPollFlags};
+use async_component_core::{AsyncComponent, ComponentPollFlags};
 
 pub struct SuspenseComponent<Fallback, Component>(SuspenseVariant<Fallback, Component>);
 

@@ -2,11 +2,8 @@
 resolver = "2"
 
 members = [
+    "crates/*",
     "async-component",
-    "async-component-components",
-    "async-component-macro",
-    
-    "async-component-winit",
 
     "examples/*"
 ]

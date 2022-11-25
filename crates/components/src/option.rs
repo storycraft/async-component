@@ -3,7 +3,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use async_component::{AsyncComponent, ComponentPollFlags, StateCell};
+use async_component_core::{AsyncComponent, ComponentPollFlags, StateCell};
 
 #[derive(Debug, Default)]
 pub struct OptionComponent<T> {

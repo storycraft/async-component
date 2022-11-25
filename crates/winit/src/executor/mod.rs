@@ -10,7 +10,7 @@ use std::{
     task::{Context, Poll, Wake, Waker},
 };
 
-use async_component::{AsyncComponent, ComponentPollFlags};
+use async_component_core::{AsyncComponent, ComponentPollFlags};
 use parking_lot::Mutex;
 use winit::event_loop::EventLoopProxy;
 
