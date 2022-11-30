@@ -10,12 +10,10 @@ use winit::{
 
 pub trait AppElement {
     fn draw(&self, target: &mut DrawTarget);
-
-    fn on_event(&mut self, _: &Event<()>) {}
 }
 
 #[derive(Debug, AsyncComponent)]
-pub struct AppContainer<T: AppElement + AsyncComponent> {
+pub struct AppContainer<T: AppElement + WinitComponent + AsyncComponent> {
     window: Window,
 
     pixels: Pixels,
@@ -27,7 +25,7 @@ pub struct AppContainer<T: AppElement + AsyncComponent> {
     _phantom: PhantomState,
 }
 
-impl<T: AppElement + AsyncComponent> AppContainer<T> {
+impl<T: AppElement + WinitComponent + AsyncComponent> AppContainer<T> {
     pub fn new(window: Window, component: T) -> Self {
         let window_size = window.inner_size();
 
@@ -76,9 +74,9 @@ impl<T: AppElement + AsyncComponent> AppContainer<T> {
     }
 }
 
-impl<T: AppElement + AsyncComponent> WinitComponent for AppContainer<T> {
-    fn on_event(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
-        self.component.on_event(&event);
+impl<T: AppElement + WinitComponent + AsyncComponent> WinitComponent for AppContainer<T> {
+    fn on_event(&mut self, event: &mut Event<()>, control_flow: &mut ControlFlow) {
+        self.component.on_event(event, control_flow);
 
         match event {
             Event::RedrawRequested(_) => self.redraw(),

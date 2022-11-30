@@ -3,11 +3,12 @@ mod env;
 use async_component::{
     components::option::OptionComponent, AsyncComponent, PhantomState, StateCell,
 };
+use async_component_winit::WinitComponent;
 use env::{AppContainer, AppElement};
 use raqote::{DrawOptions, DrawTarget, SolidSource, Source};
 use winit::{
     event::{Event, MouseButton, WindowEvent},
-    event_loop::EventLoopBuilder,
+    event_loop::{ControlFlow, EventLoopBuilder},
     window::WindowBuilder,
 };
 
@@ -66,13 +67,12 @@ impl AppElement for App {
 
         self.cursor.draw(target);
     }
+}
 
-    fn on_event(&mut self, event: &Event<()>) {
-        if let Some(center_box) = self.center_box.get_mut() {
-            center_box.on_event(event);
-        }
-
-        self.cursor.on_event(event);
+impl WinitComponent for App {
+    fn on_event(&mut self, event: &mut Event<()>, control_flow: &mut ControlFlow) {
+        self.center_box.on_event(event, control_flow);
+        self.cursor.on_event(event, control_flow);
 
         match *event {
             Event::WindowEvent {
@@ -152,4 +152,8 @@ impl AppElement for Square {
             &DrawOptions::default(),
         );
     }
+}
+
+impl WinitComponent for Square {
+    fn on_event(&mut self, _: &mut Event<()>, _: &mut ControlFlow) {}
 }
