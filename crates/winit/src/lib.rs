@@ -1,6 +1,6 @@
 #![doc = "README.md"]
 
-pub mod executor;
+mod executor;
 
 use std::{pin::Pin, task::Poll};
 
