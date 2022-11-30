@@ -70,10 +70,7 @@ impl AppElement for App {
 }
 
 impl WinitComponent for App {
-    fn on_event(&mut self, event: &mut Event<()>, control_flow: &mut ControlFlow) {
-        self.center_box.on_event(event, control_flow);
-        self.cursor.on_event(event, control_flow);
-
+    fn on_event(&mut self, event: &mut Event<()>, _: &mut ControlFlow) {
         match *event {
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { ref position, .. },
@@ -152,8 +149,4 @@ impl AppElement for Square {
             &DrawOptions::default(),
         );
     }
-}
-
-impl WinitComponent for Square {
-    fn on_event(&mut self, _: &mut Event<()>, _: &mut ControlFlow) {}
 }
