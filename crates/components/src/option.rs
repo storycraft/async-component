@@ -38,6 +38,7 @@ impl<T: AsyncComponent> OptionComponent<T> {
 
     pub fn take(&mut self) -> Option<()> {
         self.component.take()?;
+        StateCell::invalidate(&mut self.updated);
 
         Some(())
     }
@@ -67,5 +68,11 @@ impl<T: AsyncComponent> AsyncComponent for OptionComponent<T> {
         } else {
             Poll::Ready(result)
         }
+    }
+}
+
+impl<T: AsyncComponent> From<Option<T>> for OptionComponent<T> {
+    fn from(opt: Option<T>) -> Self {
+        Self::new(opt)
     }
 }
