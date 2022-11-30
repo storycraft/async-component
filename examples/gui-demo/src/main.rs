@@ -1,10 +1,12 @@
 mod env;
 
-use async_component::{AsyncComponent, PhantomState, StateCell};
+use async_component::{
+    components::option::OptionComponent, AsyncComponent, PhantomState, StateCell,
+};
 use env::{AppContainer, AppElement};
 use raqote::{DrawOptions, DrawTarget, SolidSource, Source};
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, MouseButton, WindowEvent},
     event_loop::EventLoopBuilder,
     window::WindowBuilder,
 };
@@ -27,7 +29,7 @@ fn main() {
 #[derive(AsyncComponent)]
 pub struct App {
     #[component]
-    center_box: Square,
+    center_box: OptionComponent<Square>,
 
     #[component]
     cursor: Square,
@@ -39,16 +41,7 @@ pub struct App {
 impl App {
     pub fn new() -> Self {
         Self {
-            center_box: Square::new(
-                (100.0, 100.0),
-                (100.0, 100.0),
-                Source::Solid(SolidSource {
-                    r: 0xff,
-                    g: 0x00,
-                    b: 0xff,
-                    a: 0xff,
-                }),
-            ),
+            center_box: None.into(),
             cursor: Square::new(
                 (0.0, 0.0),
                 (20.0, 20.0),
@@ -67,20 +60,61 @@ impl App {
 
 impl AppElement for App {
     fn draw(&self, target: &mut DrawTarget) {
-        self.center_box.draw(target);
+        if let Some(center_box) = self.center_box.get() {
+            center_box.draw(target);
+        }
+
         self.cursor.draw(target);
     }
 
     fn on_event(&mut self, event: &Event<()>) {
-        self.center_box.on_event(event);
+        if let Some(center_box) = self.center_box.get_mut() {
+            center_box.on_event(event);
+        }
+
         self.cursor.on_event(event);
 
-        if let Event::WindowEvent {
-            event: WindowEvent::CursorMoved { ref position, .. },
-            ..
-        } = event
-        {
-            *self.cursor.position = (position.x as _, position.y as _);
+        match *event {
+            Event::WindowEvent {
+                event: WindowEvent::CursorMoved { ref position, .. },
+                ..
+            } => {
+                *self.cursor.position = (position.x as _, position.y as _);
+            }
+
+            Event::WindowEvent {
+                event:
+                    WindowEvent::MouseInput {
+                        button: MouseButton::Left,
+                        ..
+                    },
+                ..
+            } => {
+                self.center_box.set(Some(Square {
+                    position: self.cursor.position.clone().into(),
+                    size: (100.0, 100.0).into(),
+                    source: Source::Solid(SolidSource {
+                        r: 0xff,
+                        g: 0x00,
+                        b: 0xff,
+                        a: 0xff,
+                    })
+                    .into(),
+                }));
+            }
+
+            Event::WindowEvent {
+                event:
+                    WindowEvent::MouseInput {
+                        button: MouseButton::Right,
+                        ..
+                    },
+                ..
+            } => {
+                self.center_box.take();
+            }
+
+            _ => {}
         }
     }
 }
