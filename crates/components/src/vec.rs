@@ -1,8 +1,9 @@
 use std::{
     ops::RangeBounds,
     pin::Pin,
+    slice,
     task::{Context, Poll},
-    vec, slice,
+    vec,
 };
 
 use async_component_core::{AsyncComponent, ComponentPollFlags, StateCell};
