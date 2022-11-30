@@ -3,7 +3,7 @@ name = "async-component-winit"
 description = "winit async-component wrapper"
 keywords = ["winit", "async-component"]
 categories = ["asynchronous"]
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 readme = "README.md"
 
@@ -14,8 +14,8 @@ license = "Apache-2.0"
 repository = "https://github.com/storycraft/async-component"
 
 [dependencies]
-async-component-core = { version = "0.4.0", path = "../core" }
-async-component-components = { version = "0.4.0", path = "../components" }
+async-component-core = { version = "0.4.2", path = "../core" }
+async-component-components = { version = "0.4.2", path = "../components" }
 
 winit = "0.27.5"
 parking_lot = "0.12.1"
