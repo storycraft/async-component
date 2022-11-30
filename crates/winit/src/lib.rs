@@ -1,5 +1,6 @@
 #![doc = "README.md"]
 
+pub mod components;
 mod executor;
 
 use std::{pin::Pin, task::Poll};
@@ -12,7 +13,7 @@ use winit::{
 };
 
 pub trait WinitComponent {
-    fn on_event(&mut self, event: Event<()>, control_flow: &mut ControlFlow);
+    fn on_event(&mut self, event: &mut Event<()>, control_flow: &mut ControlFlow);
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -29,7 +30,7 @@ pub fn run(
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::MainEventsCleared => {
-            component.on_event(Event::MainEventsCleared, control_flow);
+            component.on_event(&mut Event::MainEventsCleared, control_flow);
 
             if let ControlFlow::ExitWithCode(_) = control_flow {
                 return;
@@ -49,7 +50,7 @@ pub fn run(
         Event::UserEvent(_) => {}
 
         _ => {
-            component.on_event(event.map_nonuser_event().unwrap(), control_flow);
+            component.on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
         }
     });
 }
