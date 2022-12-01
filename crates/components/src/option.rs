@@ -3,7 +3,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use async_component_core::{AsyncComponent, ComponentPollFlags, StateCell};
+use async_component_core::{AsyncComponent, StateCell};
 
 #[derive(Debug, Default)]
 pub struct OptionComponent<T> {
@@ -50,23 +50,27 @@ impl<T: AsyncComponent> OptionComponent<T> {
 }
 
 impl<T: AsyncComponent> AsyncComponent for OptionComponent<T> {
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
-        let mut result = ComponentPollFlags::empty();
+    fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        let mut result = Poll::Pending;
 
-        if StateCell::refresh(&mut self.updated) {
-            result |= ComponentPollFlags::STATE;
+        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() {
+            result = Poll::Ready(());
         }
 
         if let Some(ref mut component) = self.component {
-            if let Poll::Ready(flag) = Pin::new(component).poll_next(cx) {
-                result |= flag;
+            if Pin::new(component).poll_next_state(cx).is_ready() {
+                result = Poll::Ready(());
             }
         }
 
-        if result.is_empty() {
-            Poll::Pending
+        result
+    }
+
+    fn poll_next_stream(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        if let Some(ref mut component) = self.component {
+            Pin::new(component).poll_next_stream(cx)
         } else {
-            Poll::Ready(result)
+            Poll::Pending
         }
     }
 }

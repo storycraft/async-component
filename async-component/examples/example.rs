@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use async_component::{AsyncComponent, AsyncComponentExt, ComponentPollFlags, StateCell};
+use async_component::{AsyncComponent, StateCell, AsyncComponentExt};
 use futures::{
     channel::mpsc::{channel, Receiver},
     SinkExt,
@@ -37,12 +37,10 @@ trait Drawable {
 
 async fn run(mut component: impl AsyncComponent + Drawable) {
     loop {
-        let flag = component.next().await;
+        component.next().await;
 
         // Redraw since last render is invalid
-        if flag.contains(ComponentPollFlags::STATE) {
-            component.draw();
-        }
+        component.draw();
     }
 }
 

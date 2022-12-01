@@ -1,70 +1,117 @@
+pub mod signal;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
 use std::{
     pin::Pin,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    task::{Context, Poll, Wake, Waker},
+    sync::{atomic::Ordering, Arc},
+    task::{Context, Poll, Waker},
 };
 
-use async_component_core::{AsyncComponent, ComponentPollFlags};
-use parking_lot::Mutex;
-use winit::event_loop::EventLoopProxy;
+use async_component_core::AsyncComponent;
+use winit::{
+    event::Event,
+    event_loop::{ControlFlow, EventLoop},
+};
 
-use crate::ExecutorPollEvent;
+use crate::WinitComponent;
+
+use self::signal::WinitSignal;
+
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub struct ExecutorStreamEvent;
 
 #[derive(Debug)]
-pub struct WinitExecutor {
-    signal: Arc<WinitSignal>,
-    waker: Waker,
+pub struct WinitExecutor<T> {
+    event_loop: Option<EventLoop<ExecutorStreamEvent>>,
+    component: T,
+
+    state_signal: Arc<WinitSignal>,
+    state_waker: Waker,
+
+    stream_signal: Arc<WinitSignal>,
+    stream_waker: Waker,
 }
 
-impl WinitExecutor {
-    pub fn new(proxy: EventLoopProxy<ExecutorPollEvent>) -> Self {
-        let signal = Arc::new(WinitSignal {
-            scheduled: AtomicBool::new(false),
-            proxy: Mutex::new(proxy),
-        });
+impl<T: AsyncComponent + WinitComponent> WinitExecutor<T> {
+    pub fn new(event_loop: EventLoop<ExecutorStreamEvent>, component: T) -> Self {
+        let stream_signal = Arc::new(WinitSignal::new(event_loop.create_proxy()));
+        let stream_waker = Waker::from(stream_signal.clone());
 
-        let waker = Waker::from(signal.clone());
+        let state_signal = Arc::new(WinitSignal::new(event_loop.create_proxy()));
+        let state_waker = Waker::from(stream_signal.clone());
 
-        Self { signal, waker }
+        Self {
+            event_loop: Some(event_loop),
+            component,
+
+            state_signal,
+            state_waker,
+
+            stream_signal,
+            stream_waker,
+        }
     }
 
-    pub fn poll_component(
-        &self,
-        component: Pin<&mut impl AsyncComponent>,
-    ) -> Poll<ComponentPollFlags> {
-        let _ = self.signal.scheduled.compare_exchange(
+    fn poll_stream(&mut self) {
+        if let Ok(_) = self.stream_signal.scheduled.compare_exchange(
+            true,
+            false,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ) {
+            while let Poll::Ready(_) = Pin::new(&mut self.component)
+                .poll_next_stream(&mut Context::from_waker(&self.stream_waker))
+            {}
+        }
+    }
+
+    fn poll_state(&mut self) -> Poll<()> {
+        let _ = self.state_signal.scheduled.compare_exchange(
             true,
             false,
             Ordering::AcqRel,
             Ordering::Acquire,
         );
-        component.poll_next(&mut Context::from_waker(&self.waker))
-    }
-}
 
-#[derive(Debug)]
-struct WinitSignal {
-    scheduled: AtomicBool,
-    proxy: Mutex<EventLoopProxy<ExecutorPollEvent>>,
-}
-
-impl Wake for WinitSignal {
-    fn wake(self: Arc<Self>) {
-        self.wake_by_ref()
+        Pin::new(&mut self.component).poll_next_state(&mut Context::from_waker(&self.state_waker))
     }
 
-    fn wake_by_ref(self: &Arc<Self>) {
-        if let Ok(_) =
-            self.scheduled
-                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-        {
-            self.proxy.lock().send_event(ExecutorPollEvent).ok();
-        }
+    pub fn run(mut self) -> !
+    where
+        T: 'static,
+    {
+        let event_loop = self.event_loop.take().unwrap();
+
+        event_loop.run(move |event, _, control_flow| match event {
+            Event::MainEventsCleared => {
+                self.component
+                    .on_event(&mut Event::MainEventsCleared, control_flow);
+
+                if let ControlFlow::ExitWithCode(_) = control_flow {
+                    return;
+                }
+
+                self.poll_stream();
+
+                match self.poll_state() {
+                    Poll::Ready(_) => {
+                        control_flow.set_poll();
+                    }
+                    Poll::Pending => {
+                        control_flow.set_wait();
+                    }
+                }
+            }
+
+            // Handled in Event::MainEventsCleared
+            Event::UserEvent(_) => {}
+
+            _ => {
+                self.component
+                    .on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
+            }
+        });
     }
 }

@@ -1,4 +1,4 @@
-use async_component::{AsyncComponent, ComponentPollFlags, PhantomState};
+use async_component::{AsyncComponent, PhantomState};
 use async_component_winit::WinitComponent;
 use pixels::{Pixels, SurfaceTexture};
 use raqote::DrawTarget;
@@ -46,10 +46,8 @@ impl<T: AppElement + WinitComponent + AsyncComponent> AppContainer<T> {
         }
     }
 
-    fn on_update(&mut self, flag: ComponentPollFlags) {
-        if flag.contains(ComponentPollFlags::STATE) {
-            self.window.request_redraw();
-        }
+    fn on_update(&mut self) {
+        self.window.request_redraw();
     }
 
     fn redraw(&mut self) {

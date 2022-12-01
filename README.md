@@ -8,7 +8,7 @@ UI components are retained. It only need to recalculate some layout when propert
 
 States are never updated unless some event occur from outside.
 
-Using stream like structure, we can poll for events from outside and apply update of changed value simultaneously.
+Using stream like structure, we can poll for events and apply update of changed value simultaneously.
 
 ## Example
 See `async_component/examples/example.rs` for simple example.
@@ -53,26 +53,35 @@ Counter updated to: ...
 `Component` derive macro will generate `AsyncComponent` trait implementation for `CounterComponent` like below.
 ```Rust
 impl AsyncComponent for CounterComponent {
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
-        let mut result = ComponentPollFlags::empty();
+    fn poll_next_state(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        let mut result = Poll::Pending;
 
-        if StateCell::refresh(
-            &mut self.counter
+        if StateCell::poll_state(
+            Pin::new(&mut self.counter),
+            cx
         ) {
             Self::on_counter_update(&mut self);
-            result |= ComponentPollFlags::STATE;
-        }
-        
-        while let Poll::Ready(Some(recv)) = Stream::poll_next(Pin::new(&mut self.counter_recv), cx) {
-            Self::on_counter_recv(&mut self, recv);
-            result |= ComponentPollFlags::STREAM;
+
+            if result.is_pending() {
+                result = Poll::Ready(());
+            }
         }
 
-        if result.is_empty() {
-            Poll::Pending
-        } else {
-            Poll::Ready(result)
+       result
+    }
+
+    fn poll_next_stream(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        let mut result = Poll::Pending;
+
+        if let Poll::Ready(Some(recv)) = Stream::poll_next(Pin::new(&mut self.counter_recv), cx) {
+            Self::on_counter_recv(&mut self, recv);
+
+            if result.is_pending() {
+                result = Poll::Ready(());
+            }
         }
+
+        result
     }
 }
 ```

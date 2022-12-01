@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use async_component_core::{AsyncComponent, ComponentPollFlags};
+use async_component_core::AsyncComponent;
 
 pub struct SuspenseComponent<Fallback, Component>(SuspenseVariant<Fallback, Component>);
 
@@ -42,7 +42,7 @@ impl<F: AsyncComponent, C: AsyncComponent> SuspenseComponent<F, C> {
 }
 
 impl<F: AsyncComponent, C: AsyncComponent> AsyncComponent for SuspenseComponent<F, C> {
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
+    fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
         if let SuspenseVariant::Loading { ref mut fut, .. } = self.0 {
             if let Poll::Ready(component) = Pin::new(fut).poll(cx) {
                 self.0 = SuspenseVariant::Ready(component);
@@ -52,9 +52,19 @@ impl<F: AsyncComponent, C: AsyncComponent> AsyncComponent for SuspenseComponent<
         match self.0 {
             SuspenseVariant::Loading {
                 ref mut fallback, ..
-            } => Pin::new(fallback).poll_next(cx),
+            } => Pin::new(fallback).poll_next_state(cx),
 
-            SuspenseVariant::Ready(ref mut component) => Pin::new(component).poll_next(cx),
+            SuspenseVariant::Ready(ref mut component) => Pin::new(component).poll_next_state(cx),
+        }
+    }
+
+    fn poll_next_stream(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        match self.0 {
+            SuspenseVariant::Loading {
+                ref mut fallback, ..
+            } => Pin::new(fallback).poll_next_stream(cx),
+
+            SuspenseVariant::Ready(ref mut component) => Pin::new(component).poll_next_stream(cx),
         }
     }
 }

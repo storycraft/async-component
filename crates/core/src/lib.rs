@@ -4,36 +4,67 @@
 #[path = "exports.rs"]
 pub mod __private;
 
-use futures_core::{Future, Stream};
+use futures_core::Future;
 
 use std::{
     ops::{Deref, DerefMut},
     pin::Pin,
-    task::{Context, Poll},
+    task::{Context, Poll, Waker},
 };
 
-use bitflags::bitflags;
-
 pub trait AsyncComponent: Unpin {
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags>;
+    fn poll_next_state(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()>;
+
+    fn poll_next_stream(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()>;
 }
 
 impl<T: ?Sized + AsyncComponent> AsyncComponent for Box<T> {
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
-        T::poll_next(Pin::new(&mut *self), cx)
+    fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        T::poll_next_state(Pin::new(&mut *self), cx)
+    }
+
+    fn poll_next_stream(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        T::poll_next_stream(Pin::new(&mut *self), cx)
     }
 }
 
 impl<T: ?Sized + AsyncComponent> AsyncComponent for &mut T {
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
-        Pin::new(&mut **self).poll_next(cx)
+    fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        T::poll_next_state(Pin::new(*self), cx)
+    }
+
+    fn poll_next_stream(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        T::poll_next_stream(Pin::new(*self), cx)
     }
 }
 
 pub trait AsyncComponentExt {
     fn next(&mut self) -> Next<Self>;
 
-    fn into_stream(self) -> AsyncComponentStream<Self>;
+    fn next_state(&mut self) -> NextState<Self>;
+
+    fn next_stream(&mut self) -> NextStream<Self>;
+}
+
+#[derive(Debug)]
+pub struct Next<'a, T: ?Sized>(&'a mut T);
+
+impl<T: AsyncComponent> Future for Next<'_, T> {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut result = Poll::Pending;
+
+        if Pin::new(&mut *self.0).poll_next_stream(cx).is_ready() {
+            result = Poll::Ready(());
+        }
+
+        if Pin::new(&mut *self.0).poll_next_state(cx).is_ready() {
+            result = Poll::Ready(());
+        }
+
+        result
+    }
 }
 
 impl<T: AsyncComponent> AsyncComponentExt for T {
@@ -41,30 +72,34 @@ impl<T: AsyncComponent> AsyncComponentExt for T {
         Next(self)
     }
 
-    fn into_stream(self) -> AsyncComponentStream<Self> {
-        AsyncComponentStream(self)
+    fn next_state(&mut self) -> NextState<Self> {
+        NextState(self)
+    }
+
+    fn next_stream(&mut self) -> NextStream<Self> {
+        NextStream(self)
     }
 }
 
 #[derive(Debug)]
-pub struct Next<'a, T: ?Sized>(&'a mut T);
+pub struct NextState<'a, T: ?Sized>(&'a mut T);
 
-impl<T: AsyncComponent> Future for Next<'_, T> {
-    type Output = ComponentPollFlags;
+impl<T: AsyncComponent> Future for NextState<'_, T> {
+    type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut *self.0).poll_next(cx)
+        Pin::new(&mut *self.0).poll_next_state(cx)
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct AsyncComponentStream<T: ?Sized>(T);
+#[derive(Debug)]
+pub struct NextStream<'a, T: ?Sized>(&'a mut T);
 
-impl<T: AsyncComponent> Stream for AsyncComponentStream<T> {
-    type Item = ComponentPollFlags;
+impl<T: AsyncComponent> Future for NextStream<'_, T> {
+    type Output = ();
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.0).poll_next(cx).map(Some)
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut *self.0).poll_next_stream(cx)
     }
 }
 
@@ -85,19 +120,43 @@ impl<T> StateCell<T> {
     }
 
     pub fn invalidate(this: &mut Self) {
-        if let StateStatus::None = this.status {
-            this.status = StateStatus::Changed;
+        match this.status {
+            StateStatus::None => {
+                this.status = StateStatus::Changed;
+            }
+
+            StateStatus::Pending(ref waker) => {
+                waker.wake_by_ref();
+                this.status = StateStatus::Changed;
+            }
+
+            StateStatus::Changed => {}
         }
     }
 
-    pub fn refresh(this: &mut Self) -> bool {
+    pub fn poll_state(mut this: Pin<&mut Self>, cx: &mut Context) -> Poll<()>
+    where
+        Self: Unpin,
+    {
         match this.status {
-            StateStatus::Changed => {
-                this.status = StateStatus::None;
-                true
+            StateStatus::None => {
+                this.status = StateStatus::Pending(cx.waker().clone());
+
+                Poll::Pending
             }
 
-            _ => false,
+            StateStatus::Pending(ref old_waker) => {
+                if !old_waker.will_wake(cx.waker()) {
+                    this.status = StateStatus::Pending(cx.waker().clone());
+                }
+
+                Poll::Pending
+            }
+
+            StateStatus::Changed => {
+                this.status = StateStatus::None;
+                Poll::Ready(())
+            }
         }
     }
 }
@@ -133,18 +192,12 @@ impl<T: Default> Default for StateCell<T> {
 #[derive(Debug, Clone)]
 enum StateStatus {
     None,
+    Pending(Waker),
     Changed,
 }
 
 impl Default for StateStatus {
     fn default() -> Self {
         Self::None
-    }
-}
-
-bitflags! {
-    pub struct ComponentPollFlags: u32 {
-        const STATE = 0b00000001;
-        const STREAM = 0b00000010;
     }
 }

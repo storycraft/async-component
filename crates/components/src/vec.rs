@@ -6,7 +6,7 @@ use std::{
     vec,
 };
 
-use async_component_core::{AsyncComponent, ComponentPollFlags, StateCell};
+use async_component_core::{AsyncComponent, StateCell};
 
 #[derive(Debug)]
 pub struct VecComponent<T> {
@@ -109,23 +109,31 @@ impl<T: AsyncComponent> IntoIterator for VecComponent<T> {
 }
 
 impl<T: AsyncComponent> AsyncComponent for VecComponent<T> {
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<ComponentPollFlags> {
-        let mut result = ComponentPollFlags::empty();
+    fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        let mut result = Poll::Pending;
 
-        if StateCell::refresh(&mut self.updated) {
-            result |= ComponentPollFlags::STATE;
+        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() {
+            result = Poll::Ready(());
         }
 
         for component in &mut self.vec {
-            if let Poll::Ready(flag) = Pin::new(component).poll_next(cx) {
-                result |= flag;
+            if Pin::new(component).poll_next_state(cx).is_ready() {
+                result = Poll::Ready(());
             }
         }
 
-        if result.is_empty() {
-            Poll::Pending
-        } else {
-            Poll::Ready(result)
+        result
+    }
+
+    fn poll_next_stream(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        let mut result = Poll::Pending;
+
+        for component in &mut self.vec {
+            if Pin::new(component).poll_next_stream(cx).is_ready() {
+                result = Poll::Ready(());
+            }
         }
+
+        result
     }
 }
