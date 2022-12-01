@@ -189,6 +189,14 @@ impl<T: Default> Default for StateCell<T> {
     }
 }
 
+impl<T> Drop for StateCell<T> {
+    fn drop(&mut self) {
+        if let StateStatus::Pending(ref waker) = self.status {
+            waker.wake_by_ref();
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum StateStatus {
     None,
