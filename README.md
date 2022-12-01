@@ -1,15 +1,6 @@
 # Async component
 Zero overhead reactive programming
 
-The current goal is composing gui components easily without performance degrade in Rust.
-
-## Core concepts
-UI components are retained. It only need to recalculate some layout when properties are changed.
-
-States are never updated unless some event occur from outside.
-
-Using stream like structure, we can poll for events and apply update of changed value simultaneously.
-
 ## Example
 See `async_component/examples/example.rs` for simple example.
 
