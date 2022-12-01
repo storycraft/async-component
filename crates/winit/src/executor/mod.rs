@@ -23,9 +23,8 @@ use self::signal::WinitSignal;
 pub struct ExecutorStreamEvent;
 
 #[derive(Debug)]
-pub struct WinitExecutor<T> {
+pub struct WinitExecutor {
     event_loop: Option<EventLoop<ExecutorStreamEvent>>,
-    component: T,
 
     state_signal: Arc<WinitSignal>,
     state_waker: Waker,
@@ -34,8 +33,8 @@ pub struct WinitExecutor<T> {
     stream_waker: Waker,
 }
 
-impl<T: AsyncComponent + WinitComponent> WinitExecutor<T> {
-    pub fn new(event_loop: EventLoop<ExecutorStreamEvent>, component: T) -> Self {
+impl WinitExecutor {
+    pub fn new(event_loop: EventLoop<ExecutorStreamEvent>) -> Self {
         let stream_signal = Arc::new(WinitSignal::new(event_loop.create_proxy()));
         let stream_waker = Waker::from(stream_signal.clone());
 
@@ -44,7 +43,6 @@ impl<T: AsyncComponent + WinitComponent> WinitExecutor<T> {
 
         Self {
             event_loop: Some(event_loop),
-            component,
 
             state_signal,
             state_waker,
@@ -54,20 +52,20 @@ impl<T: AsyncComponent + WinitComponent> WinitExecutor<T> {
         }
     }
 
-    fn poll_stream(&mut self) {
+    fn poll_stream(&mut self, component: &mut impl AsyncComponent) {
         if let Ok(_) = self.stream_signal.scheduled.compare_exchange(
             true,
             false,
             Ordering::AcqRel,
             Ordering::Acquire,
         ) {
-            while let Poll::Ready(_) = Pin::new(&mut self.component)
+            while let Poll::Ready(_) = Pin::new(&mut *component)
                 .poll_next_stream(&mut Context::from_waker(&self.stream_waker))
             {}
         }
     }
 
-    fn poll_state(&mut self) -> Poll<()> {
+    fn poll_state(&mut self, component: &mut impl AsyncComponent) -> Poll<()> {
         let _ = self.state_signal.scheduled.compare_exchange(
             true,
             false,
@@ -75,27 +73,23 @@ impl<T: AsyncComponent + WinitComponent> WinitExecutor<T> {
             Ordering::Acquire,
         );
 
-        Pin::new(&mut self.component).poll_next_state(&mut Context::from_waker(&self.state_waker))
+        Pin::new(component).poll_next_state(&mut Context::from_waker(&self.state_waker))
     }
 
-    pub fn run(mut self) -> !
-    where
-        T: 'static,
-    {
+    pub fn run(mut self, mut component: impl AsyncComponent + WinitComponent + 'static) -> ! {
         let event_loop = self.event_loop.take().unwrap();
 
         event_loop.run(move |event, _, control_flow| match event {
             Event::MainEventsCleared => {
-                self.component
-                    .on_event(&mut Event::MainEventsCleared, control_flow);
+                component.on_event(&mut Event::MainEventsCleared, control_flow);
 
                 if let ControlFlow::ExitWithCode(_) = control_flow {
                     return;
                 }
 
-                self.poll_stream();
+                self.poll_stream(&mut component);
 
-                match self.poll_state() {
+                match self.poll_state(&mut component) {
                     Poll::Ready(_) => {
                         control_flow.set_poll();
                     }
@@ -109,8 +103,7 @@ impl<T: AsyncComponent + WinitComponent> WinitExecutor<T> {
             Event::UserEvent(_) => {}
 
             _ => {
-                self.component
-                    .on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
+                component.on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
             }
         });
     }

@@ -18,7 +18,7 @@ pub fn run(
     event_loop: EventLoop<ExecutorStreamEvent>,
     component: impl AsyncComponent + WinitComponent + 'static,
 ) -> ! {
-    let executor = WinitExecutor::new(event_loop, component);
+    let executor = WinitExecutor::new(event_loop);
 
-    executor.run()
+    executor.run(component)
 }
