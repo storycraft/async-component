@@ -39,7 +39,7 @@ impl WinitExecutor {
         let stream_waker = Waker::from(stream_signal.clone());
 
         let state_signal = Arc::new(WinitSignal::new(event_loop.create_proxy()));
-        let state_waker = Waker::from(stream_signal.clone());
+        let state_waker = Waker::from(state_signal.clone());
 
         Self {
             event_loop: Some(event_loop),
@@ -66,14 +66,23 @@ impl WinitExecutor {
     }
 
     fn poll_state(&mut self, component: &mut impl AsyncComponent) -> Poll<()> {
-        let _ = self.state_signal.scheduled.compare_exchange(
+        if let Ok(_) = self.state_signal.scheduled.compare_exchange(
             true,
             false,
             Ordering::AcqRel,
             Ordering::Acquire,
-        );
+        ) {
+            if Pin::new(component)
+                .poll_next_state(&mut Context::from_waker(&self.state_waker))
+                .is_ready()
+            {
+                self.state_signal.scheduled.store(true, Ordering::Release);
+            }
 
-        Pin::new(component).poll_next_state(&mut Context::from_waker(&self.state_waker))
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
     }
 
     pub fn run(mut self, mut component: impl AsyncComponent + WinitComponent + 'static) -> ! {
