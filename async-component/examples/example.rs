@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use async_component::{AsyncComponent, StateCell, AsyncComponentExt};
+use async_component::{AsyncComponent, AsyncComponentExt, StateCell};
 use futures::{
     channel::mpsc::{channel, Receiver},
     SinkExt,

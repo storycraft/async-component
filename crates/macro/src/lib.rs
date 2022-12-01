@@ -140,10 +140,7 @@ fn state_poll_body(fields: &Fields) -> TokenStream {
     }
 }
 
-fn field_state_poll_body(
-    name: impl IdentFragment,
-    method_name: Option<ExprPath>,
-) -> TokenStream {
+fn field_state_poll_body(name: impl IdentFragment, method_name: Option<ExprPath>) -> TokenStream {
     let name = format_ident!("{}", name);
 
     let method_call = method_name.map(|path| quote! { #path(&mut self); });
@@ -215,7 +212,6 @@ fn field_component_poll_state_body(
     }
 }
 
-
 fn component_poll_stream_body(fields: &Fields) -> TokenStream {
     match fields {
         Fields::Named(fields) => {
@@ -252,9 +248,7 @@ fn component_poll_stream_body(fields: &Fields) -> TokenStream {
     }
 }
 
-fn field_component_poll_stream_body(
-    name: impl IdentFragment
-) -> TokenStream {
+fn field_component_poll_stream_body(name: impl IdentFragment) -> TokenStream {
     let name = format_ident!("{}", name);
 
     let update = update_result();

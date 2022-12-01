@@ -1,4 +1,10 @@
-use std::{sync::{atomic::{AtomicBool, Ordering}, Arc}, task::Wake};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    task::Wake,
+};
 
 use parking_lot::Mutex;
 use winit::event_loop::EventLoopProxy;
@@ -15,7 +21,7 @@ impl WinitSignal {
     pub const fn new(proxy: EventLoopProxy<ExecutorStreamEvent>) -> Self {
         Self {
             scheduled: AtomicBool::new(true),
-            proxy: Mutex::new(proxy)
+            proxy: Mutex::new(proxy),
         }
     }
 }
