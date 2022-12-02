@@ -4,7 +4,7 @@ pub mod components;
 pub mod executor;
 
 use async_component_core::AsyncComponent;
-use executor::{ExecutorStreamEvent, WinitExecutor};
+use executor::WinitExecutor;
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},
@@ -15,7 +15,7 @@ pub trait WinitComponent {
 }
 
 pub fn run(
-    event_loop: EventLoop<ExecutorStreamEvent>,
+    event_loop: EventLoop<()>,
     component: impl AsyncComponent + WinitComponent + 'static,
 ) -> ! {
     let executor = WinitExecutor::new(event_loop);

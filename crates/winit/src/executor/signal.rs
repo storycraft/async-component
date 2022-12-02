@@ -9,16 +9,14 @@ use std::{
 use parking_lot::Mutex;
 use winit::event_loop::EventLoopProxy;
 
-use super::ExecutorStreamEvent;
-
 #[derive(Debug)]
 pub struct WinitSignal {
     pub scheduled: AtomicBool,
-    proxy: Mutex<EventLoopProxy<ExecutorStreamEvent>>,
+    proxy: Mutex<EventLoopProxy<()>>,
 }
 
 impl WinitSignal {
-    pub const fn new(proxy: EventLoopProxy<ExecutorStreamEvent>) -> Self {
+    pub const fn new(proxy: EventLoopProxy<()>) -> Self {
         Self {
             scheduled: AtomicBool::new(true),
             proxy: Mutex::new(proxy),
@@ -36,7 +34,7 @@ impl Wake for WinitSignal {
             self.scheduled
                 .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
         {
-            self.proxy.lock().send_event(ExecutorStreamEvent).ok();
+            self.proxy.lock().send_event(()).ok();
         }
     }
 }

@@ -18,13 +18,9 @@ use crate::WinitComponent;
 
 use self::signal::WinitSignal;
 
-#[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
-pub struct ExecutorStreamEvent;
-
 #[derive(Debug)]
 pub struct WinitExecutor {
-    event_loop: Option<EventLoop<ExecutorStreamEvent>>,
+    event_loop: Option<EventLoop<()>>,
 
     state_signal: Arc<WinitSignal>,
     state_waker: Waker,
@@ -34,7 +30,7 @@ pub struct WinitExecutor {
 }
 
 impl WinitExecutor {
-    pub fn new(event_loop: EventLoop<ExecutorStreamEvent>) -> Self {
+    pub fn new(event_loop: EventLoop<()>) -> Self {
         let stream_signal = Arc::new(WinitSignal::new(event_loop.create_proxy()));
         let stream_waker = Waker::from(stream_signal.clone());
 
