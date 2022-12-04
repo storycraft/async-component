@@ -8,12 +8,12 @@ use env::{AppContainer, AppElement};
 use raqote::{DrawOptions, DrawTarget, SolidSource, Source};
 use winit::{
     event::{Event, MouseButton, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::{ControlFlow, EventLoopBuilder},
     window::WindowBuilder,
 };
 
 fn main() {
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoopBuilder::with_user_event().build();
 
     let window = WindowBuilder::new()
         .with_title("Async component GUI demo")
