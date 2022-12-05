@@ -8,10 +8,12 @@ use winit::{
     window::Window,
 };
 
+// Trait for drawing graphical element
 pub trait AppElement {
     fn draw(&self, target: &mut DrawTarget);
 }
 
+// Container component which handles rendering on child changes.
 #[derive(Debug, AsyncComponent)]
 pub struct AppContainer<T: AppElement + WinitComponent + AsyncComponent> {
     window: Window,
@@ -26,6 +28,7 @@ pub struct AppContainer<T: AppElement + WinitComponent + AsyncComponent> {
 }
 
 impl<T: AppElement + WinitComponent + AsyncComponent> AppContainer<T> {
+    // Create new [`AppContainer`]
     pub fn new(window: Window, component: T) -> Self {
         let window_size = window.inner_size();
 
@@ -46,10 +49,13 @@ impl<T: AppElement + WinitComponent + AsyncComponent> AppContainer<T> {
         }
     }
 
+    // Called on if any child component's states are updated.
     fn on_update(&mut self) {
+        // Request redraw
         self.window.request_redraw();
     }
 
+    // Redraw child [`AppElement`]
     fn redraw(&mut self) {
         let (width, height) = self.window.inner_size().into();
         let mut target = DrawTarget::new(width, height);
@@ -79,6 +85,7 @@ impl<T: AppElement + WinitComponent + AsyncComponent> WinitComponent for AppCont
         match event {
             Event::RedrawRequested(_) => self.redraw(),
 
+            // Resize surface on window resize 
             Event::WindowEvent {
                 event: WindowEvent::Resized(new_size),
                 ..
@@ -87,6 +94,7 @@ impl<T: AppElement + WinitComponent + AsyncComponent> WinitComponent for AppCont
                 self.pixels.resize_surface(new_size.width, new_size.height);
             }
 
+            // Exit if close button is clicked
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..

@@ -1,3 +1,5 @@
+//! Specialized async Executor built on top of winit event loop for running [`AsyncComponent`]
+
 pub mod signal;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
@@ -18,13 +20,17 @@ use crate::WinitComponent;
 
 use self::signal::WinitSignal;
 
+/// Reserved zero sized user event struct used for waking winit eventloop
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
-pub struct ExecutorStreamEvent;
+pub struct ExecutorPollEvent;
 
+/// Executor implemented on top of winit eventloop using user event.
+/// 
+/// See [`WinitSignal`] for more detail how it utilize winit user event.
 #[derive(Debug)]
 pub struct WinitExecutor {
-    event_loop: Option<EventLoop<ExecutorStreamEvent>>,
+    event_loop: Option<EventLoop<ExecutorPollEvent>>,
 
     state_signal: Arc<WinitSignal>,
     state_waker: Waker,
@@ -34,7 +40,8 @@ pub struct WinitExecutor {
 }
 
 impl WinitExecutor {
-    pub fn new(event_loop: EventLoop<ExecutorStreamEvent>) -> Self {
+    /// Create new [`WinitExecutor`]
+    pub fn new(event_loop: EventLoop<ExecutorPollEvent>) -> Self {
         let stream_signal = Arc::new(WinitSignal::new(event_loop.create_proxy()));
         let stream_waker = Waker::from(stream_signal.clone());
 
@@ -85,6 +92,9 @@ impl WinitExecutor {
         }
     }
 
+    /// Initializes the winit event loop and run component.
+    /// 
+    /// See [`EventLoop`] for more detail about winit event loop
     pub fn run(mut self, mut component: impl AsyncComponent + WinitComponent + 'static) -> ! {
         let event_loop = self.event_loop.take().unwrap();
 

@@ -11,6 +11,7 @@ use tokio::time::sleep;
 async fn main() {
     let (mut sender, recv) = channel(8);
 
+    // Spawn task that sends number with 1 sec interval
     tokio::spawn(async move {
         let mut i = 0;
         loop {
@@ -21,6 +22,7 @@ async fn main() {
         }
     });
 
+    // Run LoginForm component
     run(LoginForm {
         id: "user".to_string().into(),
         password: "1234".to_string().into(),
@@ -35,6 +37,8 @@ trait Drawable {
     fn draw(&self);
 }
 
+// Run function
+// Wait component for update and redraw each time updated.
 async fn run(mut component: impl AsyncComponent + Drawable) {
     loop {
         component.next().await;
@@ -44,6 +48,7 @@ async fn run(mut component: impl AsyncComponent + Drawable) {
     }
 }
 
+// Component which draw counter on update
 #[derive(Debug, AsyncComponent)]
 struct CounterComponent {
     #[state]
@@ -58,6 +63,7 @@ impl Drawable for CounterComponent {
     }
 }
 
+// Simple login form component which draw login form and have [`CounterComponent`] as child
 #[derive(Debug, AsyncComponent)]
 // Called if any states are updated
 #[component(Self::update)]
@@ -76,18 +82,22 @@ struct LoginForm {
 }
 
 impl LoginForm {
+    // Print message if self.id updated
     fn on_id_update(&mut self) {
         println!("Id updated: {}", *self.id);
     }
 
+    // Print message if self.password updated
     fn on_password_update(&mut self) {
         println!("Password updated: {}", *self.password);
     }
 
+    // Print message if component is updated
     fn update(&mut self) {
         println!("LoginForm updated: {:?}", self);
     }
 
+    // Update sub component when counter number is received through channel
     fn on_counter_recv(&mut self, counter: i32) {
         *self.sub_component.counter = counter;
     }

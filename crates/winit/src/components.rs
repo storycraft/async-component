@@ -1,3 +1,5 @@
+//! Implements [`WinitComponent`] trait to default components
+
 use async_component_components::{OptionComponent, SuspenseComponent, VecComponent};
 use async_component_core::AsyncComponent;
 use winit::{event::Event, event_loop::ControlFlow};

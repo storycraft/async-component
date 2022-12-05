@@ -12,6 +12,7 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
+/// Core trait
 pub trait AsyncComponent: Unpin {
     fn poll_next_state(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()>;
 
@@ -105,6 +106,10 @@ impl<T: AsyncComponent> Future for NextStream<'_, T> {
 
 pub type PhantomState = StateCell<()>;
 
+/// Track change of value and notify the Executor.
+/// This struct has no method and implements [`Deref`], [`DerefMut`].
+/// When inner value is mutable dereferenced, it changes status and wake pending task.
+/// This will also wake pending task when the cell is dropped.
 #[derive(Debug)]
 pub struct StateCell<T> {
     status: StateStatus,
@@ -112,6 +117,7 @@ pub struct StateCell<T> {
 }
 
 impl<T> StateCell<T> {
+    /// Create new [`StateCell`]
     pub const fn new(inner: T) -> Self {
         Self {
             status: StateStatus::Changed,
@@ -119,6 +125,8 @@ impl<T> StateCell<T> {
         }
     }
 
+    /// Invalidate this [`StateCell`].
+    /// It wakes task if there is any waker pending.
     pub fn invalidate(this: &mut Self) {
         match this.status {
             StateStatus::None => {
@@ -134,6 +142,7 @@ impl<T> StateCell<T> {
         }
     }
 
+    /// Check if there are any changes or saves waker to wake task to notify when the value is changed.
     pub fn poll_state(mut this: Pin<&mut Self>, cx: &mut Context) -> Poll<()>
     where
         Self: Unpin,

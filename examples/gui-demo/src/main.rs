@@ -12,7 +12,14 @@ use winit::{
     window::WindowBuilder,
 };
 
+// This example is simple reactive graphical application.
+// * Draws white square cursor.
+// * Draws magenta square to clicked position on left click.
+// * Remove magenta square on right click.
+// Efficiently redraw without messy explicit redraw codes using async-component.
+
 fn main() {
+    // Setup winit window
     let event_loop = EventLoopBuilder::with_user_event().build();
 
     let window = WindowBuilder::new()
@@ -24,17 +31,21 @@ fn main() {
 
     let app = App::new();
 
+    // Start winit eventloop and run Executor using async_component_winit crate
     async_component_winit::run(event_loop, AppContainer::new(window, app));
 }
 
 #[derive(AsyncComponent)]
 pub struct App {
+    // Optional component
     #[component]
     center_box: OptionComponent<Square>,
 
+    // Cursor square
     #[component]
     cursor: Square,
 
+    // A component must have atleast one state to able to track changes of component. it is for that.
     #[state]
     _phantom: PhantomState,
 }
@@ -60,6 +71,7 @@ impl App {
 }
 
 impl AppElement for App {
+    // Draw children elements
     fn draw(&self, target: &mut DrawTarget) {
         if let Some(center_box) = self.center_box.get() {
             center_box.draw(target);
@@ -72,6 +84,8 @@ impl AppElement for App {
 impl WinitComponent for App {
     fn on_event(&mut self, event: &mut Event<()>, _: &mut ControlFlow) {
         match *event {
+
+            // Update position state to actual cursor position
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { ref position, .. },
                 ..
@@ -79,6 +93,7 @@ impl WinitComponent for App {
                 *self.cursor.position = (position.x as _, position.y as _);
             }
 
+            // Add center_box element on left click
             Event::WindowEvent {
                 event:
                     WindowEvent::MouseInput {
@@ -100,6 +115,7 @@ impl WinitComponent for App {
                 }));
             }
 
+            // Take center_box element on right click
             Event::WindowEvent {
                 event:
                     WindowEvent::MouseInput {
@@ -116,6 +132,7 @@ impl WinitComponent for App {
     }
 }
 
+// Square with position, size and source states.
 #[derive(AsyncComponent)]
 pub struct Square {
     #[state]
@@ -139,6 +156,7 @@ impl Square {
 }
 
 impl AppElement for Square {
+    // Draw rectangle
     fn draw(&self, target: &mut DrawTarget) {
         target.fill_rect(
             self.position.0,
