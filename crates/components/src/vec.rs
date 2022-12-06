@@ -1,7 +1,7 @@
 use std::{
     ops::RangeBounds,
     pin::Pin,
-    slice,
+    slice::{self, Iter, IterMut},
     task::{Context, Poll},
     vec,
 };
@@ -69,6 +69,15 @@ impl<T: AsyncComponent> VecComponent<T> {
     pub fn clear(&mut self) {
         self.vec.clear();
         StateCell::invalidate(&mut self.updated);
+    }
+    
+    pub fn iter(&self) -> Iter<T> {
+        self.vec.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<T> {
+        StateCell::invalidate(&mut self.updated);
+        self.vec.iter_mut()
     }
 }
 
