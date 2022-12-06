@@ -12,21 +12,21 @@ use async_component_core::{AsyncComponent, StateCell};
 
 #[derive(Debug)]
 pub struct HashMapComponent<K, V, S = RandomState> {
-    _state: StateCell<()>,
+    updated: StateCell<()>,
     map: HashMap<K, V, S>,
 }
 
 impl<K: Eq + Hash, V> HashMapComponent<K, V, RandomState> {
     pub fn new() -> Self {
         Self {
-            _state: StateCell::new(()),
+            updated: StateCell::new(()),
             map: HashMap::new(),
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            _state: StateCell::new(()),
+            updated: StateCell::new(()),
             map: HashMap::with_capacity(capacity),
         }
     }
@@ -35,13 +35,13 @@ impl<K: Eq + Hash, V> HashMapComponent<K, V, RandomState> {
 impl<K: Eq + Hash, V, S: BuildHasher> HashMapComponent<K, V, S> {
     pub fn with_hasher(hash_builder: S) -> Self {
         Self {
-            _state: StateCell::new(()),
+            updated: StateCell::new(()),
             map: HashMap::with_hasher(hash_builder),
         }
     }
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
         Self {
-            _state: StateCell::new(()),
+            updated: StateCell::new(()),
             map: HashMap::with_capacity_and_hasher(capacity, hash_builder),
         }
     }
@@ -52,10 +52,14 @@ impl<K: Eq + Hash, V, S: BuildHasher> HashMapComponent<K, V, S> {
 
     pub fn insert(&mut self, key: K, value: V) {
         self.map.insert(key, value);
+        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn remove(&mut self, key: &K) -> Option<()> {
-        self.map.remove(key).map(|_| ())
+        self.map.remove(key)?;
+        
+        StateCell::invalidate(&mut self.updated);
+        Some(())
     }
 
     pub fn keys(&self) -> Keys<K, V> {
@@ -80,13 +84,16 @@ impl<K: Eq + Hash, V, S: BuildHasher> HashMapComponent<K, V, S> {
 
     pub fn clear(&mut self) {
         self.map.clear();
+        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn retain(&mut self, f: impl FnMut(&K, &mut V) -> bool) {
         self.map.retain(f);
+        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn entry(&mut self, key: K) -> Entry<K, V> {
+        StateCell::invalidate(&mut self.updated);
         self.map.entry(key)
     }
 
@@ -135,7 +142,7 @@ impl<K: Eq + Hash + Unpin, V: Unpin + AsyncComponent, S: Unpin> AsyncComponent
     fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
         let mut poll = Poll::Pending;
 
-        if StateCell::poll_state(Pin::new(&mut self._state), cx).is_ready() {
+        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() {
             poll = Poll::Ready(());
         }
 

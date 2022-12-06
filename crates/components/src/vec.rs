@@ -10,22 +10,21 @@ use async_component_core::{AsyncComponent, StateCell};
 
 #[derive(Debug)]
 pub struct VecComponent<T> {
-    _state: StateCell<()>,
-
+    updated: StateCell<()>,
     vec: Vec<T>,
 }
 
 impl<T: AsyncComponent> VecComponent<T> {
     pub const fn new() -> Self {
         Self {
-            _state: StateCell::new(()),
+            updated: StateCell::new(()),
             vec: Vec::new(),
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            _state: StateCell::new(()),
+            updated: StateCell::new(()),
             vec: Vec::with_capacity(capacity),
         }
     }
@@ -36,32 +35,39 @@ impl<T: AsyncComponent> VecComponent<T> {
 
     pub fn remove(&mut self, index: usize) {
         self.vec.remove(index);
+        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn push(&mut self, component: T) {
         self.vec.push(component);
+        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn append(&mut self, other: &mut Vec<T>) {
         self.vec.append(other);
+        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn pop(&mut self) -> Option<()> {
         self.vec.pop()?;
+        StateCell::invalidate(&mut self.updated);
 
         Some(())
     }
 
     pub fn drain(&mut self, range: impl RangeBounds<usize>) {
         self.vec.drain(range);
+        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn retain(&mut self, f: impl FnMut(&T) -> bool) {
         self.vec.retain(f);
+        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn clear(&mut self) {
         self.vec.clear();
+        StateCell::invalidate(&mut self.updated);
     }
     
     pub fn iter(&self) -> Iter<T> {
@@ -113,7 +119,7 @@ impl<T: AsyncComponent> AsyncComponent for VecComponent<T> {
     fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
         let mut result = Poll::Pending;
 
-        if StateCell::poll_state(Pin::new(&mut self._state), cx).is_ready() {
+        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() {
             result = Poll::Ready(());
         }
 
