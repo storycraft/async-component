@@ -1,10 +1,4 @@
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    task::Wake,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::Mutex;
 use winit::event_loop::EventLoopProxy;
@@ -28,12 +22,8 @@ impl WinitSignal {
     }
 }
 
-impl Wake for WinitSignal {
-    fn wake(self: Arc<Self>) {
-        self.wake_by_ref()
-    }
-
-    fn wake_by_ref(self: &Arc<Self>) {
+impl WinitSignal {
+    pub fn wake_by_ref(&self) {
         if let Ok(_) =
             self.scheduled
                 .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)

@@ -5,9 +5,10 @@ pub mod signal;
 mod wasm;
 
 use std::{
+    mem,
     pin::Pin,
-    sync::{atomic::Ordering, Arc},
-    task::{Context, Poll, Waker},
+    sync::atomic::Ordering,
+    task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 
 use async_component_core::AsyncComponent;
@@ -26,53 +27,46 @@ use self::signal::WinitSignal;
 pub struct ExecutorPollEvent;
 
 /// Executor implemented on top of winit eventloop using user event.
-/// 
+///
 /// See [`WinitSignal`] for more detail how it utilize winit user event.
 #[derive(Debug)]
 pub struct WinitExecutor {
     event_loop: Option<EventLoop<ExecutorPollEvent>>,
 
-    state_signal: Arc<WinitSignal>,
-    state_waker: Waker,
-
-    stream_signal: Arc<WinitSignal>,
-    stream_waker: Waker,
+    state_signal: WinitSignal,
+    stream_signal: WinitSignal,
 }
 
 impl WinitExecutor {
     /// Create new [`WinitExecutor`]
     pub fn new(event_loop: EventLoop<ExecutorPollEvent>) -> Self {
-        let stream_signal = Arc::new(WinitSignal::new(event_loop.create_proxy()));
-        let stream_waker = Waker::from(stream_signal.clone());
-
-        let state_signal = Arc::new(WinitSignal::new(event_loop.create_proxy()));
-        let state_waker = Waker::from(state_signal.clone());
+        let state_signal = WinitSignal::new(event_loop.create_proxy());
+        let stream_signal = WinitSignal::new(event_loop.create_proxy());
 
         Self {
             event_loop: Some(event_loop),
 
             state_signal,
-            state_waker,
-
             stream_signal,
-            stream_waker,
         }
     }
 
-    fn poll_stream(&mut self, component: &mut impl AsyncComponent) {
+    fn poll_stream(&'static self, component: &mut impl AsyncComponent) {
         if let Ok(_) = self.stream_signal.scheduled.compare_exchange(
             true,
             false,
             Ordering::AcqRel,
             Ordering::Acquire,
         ) {
-            while let Poll::Ready(_) = Pin::new(&mut *component)
-                .poll_next_stream(&mut Context::from_waker(&self.stream_waker))
+            while let Poll::Ready(_) =
+                Pin::new(&mut *component).poll_next_stream(&mut Context::from_waker(&unsafe {
+                    Waker::from_raw(create_raw_waker(&self.stream_signal))
+                }))
             {}
         }
     }
 
-    fn poll_state(&mut self, component: &mut impl AsyncComponent) -> Poll<()> {
+    fn poll_state(&'static self, component: &mut impl AsyncComponent) -> Poll<()> {
         if let Ok(_) = self.state_signal.scheduled.compare_exchange(
             true,
             false,
@@ -80,7 +74,9 @@ impl WinitExecutor {
             Ordering::Acquire,
         ) {
             if Pin::new(component)
-                .poll_next_state(&mut Context::from_waker(&self.state_waker))
+                .poll_next_state(&mut Context::from_waker(&unsafe {
+                    Waker::from_raw(create_raw_waker(&self.state_signal))
+                }))
                 .is_ready()
             {
                 self.state_signal.scheduled.store(true, Ordering::Release);
@@ -93,37 +89,65 @@ impl WinitExecutor {
     }
 
     /// Initializes the winit event loop and run component.
-    /// 
+    ///
     /// See [`EventLoop`] for more detail about winit event loop
     pub fn run(mut self, mut component: impl AsyncComponent + WinitComponent + 'static) -> ! {
         let event_loop = self.event_loop.take().unwrap();
 
-        event_loop.run(move |event, _, control_flow| match event {
-            Event::MainEventsCleared => {
-                component.on_event(&mut Event::MainEventsCleared, control_flow);
+        // SAFETY: Process exit before this Executor become invalid
+        let executor = unsafe { mem::transmute::<&Self, &'static Self>(&self) };
 
-                if let ControlFlow::ExitWithCode(_) = control_flow {
-                    return;
+        event_loop.run(move |event, _, control_flow| {
+            match event {
+                Event::MainEventsCleared => {
+                    component.on_event(&mut Event::MainEventsCleared, control_flow);
+
+                    if let ControlFlow::ExitWithCode(_) = control_flow {
+                        return;
+                    }
+
+                    executor.poll_stream(&mut component);
+
+                    match executor.poll_state(&mut component) {
+                        Poll::Ready(_) => {
+                            control_flow.set_poll();
+                        }
+                        Poll::Pending => {
+                            control_flow.set_wait();
+                        }
+                    }
                 }
 
-                self.poll_stream(&mut component);
+                // Handled in Event::MainEventsCleared
+                Event::UserEvent(_) => {}
 
-                match self.poll_state(&mut component) {
-                    Poll::Ready(_) => {
-                        control_flow.set_poll();
-                    }
-                    Poll::Pending => {
-                        control_flow.set_wait();
-                    }
+                _ => {
+                    component.on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
                 }
             }
-
-            // Handled in Event::MainEventsCleared
-            Event::UserEvent(_) => {}
-
-            _ => {
-                component.on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
-            }
-        });
+        })
     }
+}
+
+fn create_raw_waker(signal: &'static WinitSignal) -> RawWaker {
+    unsafe fn waker_clone(this: *const ()) -> RawWaker {
+        create_raw_waker(&*(this as *const WinitSignal))
+    }
+
+    unsafe fn waker_wake(this: *const ()) {
+        let this = &*(this as *const WinitSignal);
+        this.wake_by_ref();
+    }
+
+    unsafe fn waker_wake_by_ref(this: *const ()) {
+        let this = &*(this as *const WinitSignal);
+        this.wake_by_ref();
+    }
+
+    unsafe fn waker_drop(_: *const ()) {}
+
+    RawWaker::new(
+        signal as *const _ as *const (),
+        &RawWakerVTable::new(waker_clone, waker_wake, waker_wake_by_ref, waker_drop),
+    )
 }
