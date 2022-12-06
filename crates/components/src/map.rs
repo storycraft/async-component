@@ -55,6 +55,14 @@ impl<K: Eq + Hash, V, S: BuildHasher> HashMapComponent<K, V, S> {
         StateCell::invalidate(&mut self.updated);
     }
 
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.map.get(key)
+    }
+
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        self.map.get_mut(key)
+    }
+
     pub fn remove(&mut self, key: &K) -> Option<()> {
         self.map.remove(key)?;
         
