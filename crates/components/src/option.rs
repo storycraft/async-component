@@ -7,7 +7,7 @@ use async_component_core::{AsyncComponent, StateCell};
 
 #[derive(Debug, Default)]
 pub struct OptionComponent<T> {
-    updated: StateCell<()>,
+    _state: StateCell<()>,
 
     component: Option<T>,
 }
@@ -15,7 +15,7 @@ pub struct OptionComponent<T> {
 impl<T: AsyncComponent> OptionComponent<T> {
     pub const fn new(component: Option<T>) -> Self {
         Self {
-            updated: StateCell::new(()),
+            _state: StateCell::new(()),
             component,
         }
     }
@@ -38,14 +38,12 @@ impl<T: AsyncComponent> OptionComponent<T> {
 
     pub fn take(&mut self) -> Option<()> {
         self.component.take()?;
-        StateCell::invalidate(&mut self.updated);
 
         Some(())
     }
 
     pub fn set(&mut self, component: Option<T>) {
         self.component = component;
-        StateCell::invalidate(&mut self.updated);
     }
 }
 
@@ -53,7 +51,7 @@ impl<T: AsyncComponent> AsyncComponent for OptionComponent<T> {
     fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
         let mut result = Poll::Pending;
 
-        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() {
+        if StateCell::poll_state(Pin::new(&mut self._state), cx).is_ready() {
             result = Poll::Ready(());
         }
 

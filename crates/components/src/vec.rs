@@ -10,7 +10,7 @@ use async_component_core::{AsyncComponent, StateCell};
 
 #[derive(Debug)]
 pub struct VecComponent<T> {
-    updated: StateCell<()>,
+    _state: StateCell<()>,
 
     vec: Vec<T>,
 }
@@ -18,14 +18,14 @@ pub struct VecComponent<T> {
 impl<T: AsyncComponent> VecComponent<T> {
     pub const fn new() -> Self {
         Self {
-            updated: StateCell::new(()),
+            _state: StateCell::new(()),
             vec: Vec::new(),
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            updated: StateCell::new(()),
+            _state: StateCell::new(()),
             vec: Vec::with_capacity(capacity),
         }
     }
@@ -36,39 +36,32 @@ impl<T: AsyncComponent> VecComponent<T> {
 
     pub fn remove(&mut self, index: usize) {
         self.vec.remove(index);
-        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn push(&mut self, component: T) {
         self.vec.push(component);
-        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn append(&mut self, other: &mut Vec<T>) {
         self.vec.append(other);
-        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn pop(&mut self) -> Option<()> {
         self.vec.pop()?;
-        StateCell::invalidate(&mut self.updated);
 
         Some(())
     }
 
     pub fn drain(&mut self, range: impl RangeBounds<usize>) {
         self.vec.drain(range);
-        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn retain(&mut self, f: impl FnMut(&T) -> bool) {
         self.vec.retain(f);
-        StateCell::invalidate(&mut self.updated);
     }
 
     pub fn clear(&mut self) {
         self.vec.clear();
-        StateCell::invalidate(&mut self.updated);
     }
     
     pub fn iter(&self) -> Iter<T> {
@@ -76,7 +69,6 @@ impl<T: AsyncComponent> VecComponent<T> {
     }
 
     pub fn iter_mut(&mut self) -> IterMut<T> {
-        StateCell::invalidate(&mut self.updated);
         self.vec.iter_mut()
     }
 }
@@ -93,7 +85,7 @@ impl<'a, T: AsyncComponent> IntoIterator for &'a VecComponent<T> {
     type IntoIter = slice::Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.vec.iter()
+        self.iter()
     }
 }
 
@@ -103,7 +95,7 @@ impl<'a, T: AsyncComponent> IntoIterator for &'a mut VecComponent<T> {
     type IntoIter = slice::IterMut<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.vec.iter_mut()
+        self.iter_mut()
     }
 }
 
@@ -121,7 +113,7 @@ impl<T: AsyncComponent> AsyncComponent for VecComponent<T> {
     fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
         let mut result = Poll::Pending;
 
-        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() {
+        if StateCell::poll_state(Pin::new(&mut self._state), cx).is_ready() {
             result = Poll::Ready(());
         }
 
