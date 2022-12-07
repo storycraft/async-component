@@ -11,7 +11,7 @@ impl<'a, T: 'static> StaticRef<'a, T> {
     }
 
     pub unsafe fn get(&self) -> &'static T {
-        mem::transmute::<&T, &'static T>(&self.value)
+        mem::transmute::<&T, &'static T>(self.value)
     }
 }
 
