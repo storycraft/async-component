@@ -21,17 +21,16 @@ impl<T> Drop for StaticRef<'_, T> {
     }
 }
 
-/// Pin value in stack and reference with 'static lifetime
+/// Reference with 'static lifetime
 ///
-/// Dropping pinned value aborts process
+/// If current function panics or returns it aborts process before returning
 #[macro_export]
 macro_rules! static_ref {
-    ($value: ident, $expr: expr) => {
-        let mut $value = $expr;
-        let $value = crate::executor::static_ref::StaticRef::new(&mut $value);
+    ($name: ident, $expr: expr) => {
+        let $name = crate::executor::static_ref::StaticRef::new($expr);
 
         // SAFETY: Process aborts before this become invalid
-        let $value = unsafe { $value.get() };
+        let $name = unsafe { $name.get() };
     };
 }
 

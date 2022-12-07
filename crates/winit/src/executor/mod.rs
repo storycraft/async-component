@@ -94,7 +94,7 @@ impl WinitExecutor {
     pub fn run(mut self, mut component: impl AsyncComponent + WinitComponent + 'static) -> ! {
         let event_loop = self.event_loop.take().unwrap();
 
-        static_ref!(executor, self);
+        static_ref!(executor, &mut self);
 
         event_loop.run(move |event, _, control_flow| {
             match event {
