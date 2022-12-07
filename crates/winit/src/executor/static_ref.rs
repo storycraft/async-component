@@ -21,7 +21,7 @@ impl<T> Drop for StaticRef<'_, T> {
     }
 }
 
-/// Pin value in stack and borrow reference with 'static lifetime
+/// Pin value in stack and reference with 'static lifetime
 ///
 /// Dropping pinned value aborts process
 #[macro_export]
