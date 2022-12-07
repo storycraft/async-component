@@ -1,4 +1,4 @@
-#![doc = "../README.md"]
+#![doc = include_str!("../README.md")]
 
 #[doc(hidden)]
 #[path = "exports.rs"]
