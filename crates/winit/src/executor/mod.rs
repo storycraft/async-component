@@ -1,7 +1,6 @@
 //! Specialized async Executor built on top of winit event loop for running [`AsyncComponent`]
 
 pub mod signal;
-mod static_ref;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
@@ -12,12 +11,13 @@ use std::{
 };
 
 use async_component_core::AsyncComponent;
+use ref_extended::pin_ref_extended;
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},
 };
 
-use crate::{static_ref, WinitComponent};
+use crate::WinitComponent;
 
 use self::signal::WinitSignal;
 
@@ -94,7 +94,7 @@ impl WinitExecutor {
     pub fn run(mut self, mut component: impl AsyncComponent + WinitComponent + 'static) -> ! {
         let event_loop = self.event_loop.take().unwrap();
 
-        static_ref!(executor, &mut self);
+        pin_ref_extended!(executor, self);
 
         event_loop.run(move |event, _, control_flow| {
             match event {
