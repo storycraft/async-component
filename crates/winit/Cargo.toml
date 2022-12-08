@@ -19,4 +19,4 @@ async-component-components = { version = "0.5.4", path = "../components" }
 
 winit = "0.27.5"
 parking_lot = "0.12.1"
-ref-extended = "0.2.0"
+ref-extended = "0.2.1"

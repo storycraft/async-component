@@ -96,37 +96,35 @@ impl WinitExecutor {
         let event_loop = self.event_loop.take().unwrap();
 
         let executor = self;
-        ref_extended!(|&executor| {
-            event_loop.run(move |event, _, control_flow| {
-                match event {
-                    Event::MainEventsCleared => {
-                        component.on_event(&mut Event::MainEventsCleared, control_flow);
+        ref_extended!(|&executor| event_loop.run(move |event, _, control_flow| {
+            match event {
+                Event::MainEventsCleared => {
+                    component.on_event(&mut Event::MainEventsCleared, control_flow);
 
-                        if let ControlFlow::ExitWithCode(_) = control_flow {
-                            return;
-                        }
-
-                        executor.poll_stream(&mut component);
-
-                        match executor.poll_state(&mut component) {
-                            Poll::Ready(_) => {
-                                control_flow.set_poll();
-                            }
-                            Poll::Pending => {
-                                control_flow.set_wait();
-                            }
-                        }
+                    if let ControlFlow::ExitWithCode(_) = control_flow {
+                        return;
                     }
 
-                    // Handled in Event::MainEventsCleared
-                    Event::UserEvent(_) => {}
+                    executor.poll_stream(&mut component);
 
-                    _ => {
-                        component.on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
+                    match executor.poll_state(&mut component) {
+                        Poll::Ready(_) => {
+                            control_flow.set_poll();
+                        }
+                        Poll::Pending => {
+                            control_flow.set_wait();
+                        }
                     }
                 }
-            })
-        });
+
+                // Handled in Event::MainEventsCleared
+                Event::UserEvent(_) => {}
+
+                _ => {
+                    component.on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
+                }
+            }
+        }))
     }
 }
 
