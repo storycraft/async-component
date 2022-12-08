@@ -84,7 +84,6 @@ impl AppElement for App {
 impl WinitComponent for App {
     fn on_event(&mut self, event: &mut Event<()>, _: &mut ControlFlow) {
         match *event {
-
             // Update position state to actual cursor position
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { ref position, .. },

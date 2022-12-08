@@ -65,7 +65,7 @@ impl<K: Eq + Hash, V, S: BuildHasher> HashMapComponent<K, V, S> {
 
     pub fn remove(&mut self, key: &K) -> Option<()> {
         self.map.remove(key)?;
-        
+
         StateCell::invalidate(&mut self.updated);
         Some(())
     }

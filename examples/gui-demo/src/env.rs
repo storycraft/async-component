@@ -85,7 +85,7 @@ impl<T: AppElement + WinitComponent + AsyncComponent> WinitComponent for AppCont
         match event {
             Event::RedrawRequested(_) => self.redraw(),
 
-            // Resize surface on window resize 
+            // Resize surface on window resize
             Event::WindowEvent {
                 event: WindowEvent::Resized(new_size),
                 ..

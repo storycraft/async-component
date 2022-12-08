@@ -69,7 +69,7 @@ impl<T: AsyncComponent> VecComponent<T> {
         self.vec.clear();
         StateCell::invalidate(&mut self.updated);
     }
-    
+
     pub fn iter(&self) -> Iter<T> {
         self.vec.iter()
     }
