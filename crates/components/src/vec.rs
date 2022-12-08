@@ -124,10 +124,8 @@ impl<T: AsyncComponent> AsyncComponent for VecComponent<T> {
         }
 
         for component in &mut self.vec {
-            if Pin::new(component).poll_next_state(cx).is_ready() {
-                if result.is_pending() {
-                    result = Poll::Ready(());
-                }
+            if Pin::new(component).poll_next_state(cx).is_ready() && result.is_pending() {
+                result = Poll::Ready(());
             }
         }
 
@@ -138,10 +136,8 @@ impl<T: AsyncComponent> AsyncComponent for VecComponent<T> {
         let mut result = Poll::Pending;
 
         for component in &mut self.vec {
-            if Pin::new(component).poll_next_stream(cx).is_ready() {
-                if result.is_pending() {
-                    result = Poll::Ready(());
-                }
+            if Pin::new(component).poll_next_stream(cx).is_ready() && result.is_pending() {
+                result = Poll::Ready(());
             }
         }
 

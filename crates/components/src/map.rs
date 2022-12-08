@@ -47,7 +47,7 @@ impl<K: Eq + Hash, V, S: BuildHasher> HashMapComponent<K, V, S> {
     }
 
     pub fn contains_key(&self, key: &K) -> bool {
-        self.map.contains_key(&key)
+        self.map.contains_key(key)
     }
 
     pub fn insert(&mut self, key: K, value: V) {
@@ -155,10 +155,8 @@ impl<K: Eq + Hash + Unpin, V: Unpin + AsyncComponent, S: Unpin> AsyncComponent
         }
 
         for component in self.map.values_mut() {
-            if Pin::new(component).poll_next_state(cx).is_ready() {
-                if poll.is_pending() {
-                    poll = Poll::Ready(());
-                }
+            if Pin::new(component).poll_next_state(cx).is_ready() && poll.is_pending() {
+                poll = Poll::Ready(());
             }
         }
 
@@ -169,10 +167,8 @@ impl<K: Eq + Hash + Unpin, V: Unpin + AsyncComponent, S: Unpin> AsyncComponent
         let mut poll = Poll::Pending;
 
         for component in self.map.values_mut() {
-            if Pin::new(component).poll_next_stream(cx).is_ready() {
-                if poll.is_pending() {
-                    poll = Poll::Ready(());
-                }
+            if Pin::new(component).poll_next_stream(cx).is_ready() && poll.is_pending() {
+                poll = Poll::Ready(());
             }
         }
 

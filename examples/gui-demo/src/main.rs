@@ -102,7 +102,7 @@ impl WinitComponent for App {
                 ..
             } => {
                 self.center_box.set(Some(Square {
-                    position: self.cursor.position.clone().into(),
+                    position: (*self.cursor.position).into(),
                     size: (100.0, 100.0).into(),
                     source: Source::Solid(SolidSource {
                         r: 0xff,

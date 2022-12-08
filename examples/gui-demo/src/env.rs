@@ -35,10 +35,9 @@ impl<T: AppElement + WinitComponent + AsyncComponent> AppContainer<T> {
         let pixels = {
             let surface_texture =
                 SurfaceTexture::new(window_size.width, window_size.height, &window);
-            let pixels =
-                Pixels::new(window_size.width, window_size.height, surface_texture).unwrap();
+            
 
-            pixels
+            Pixels::new(window_size.width, window_size.height, surface_texture).unwrap()
         };
 
         Self {

@@ -58,10 +58,8 @@ impl<T: AsyncComponent> AsyncComponent for OptionComponent<T> {
         }
 
         if let Some(ref mut component) = self.component {
-            if Pin::new(component).poll_next_state(cx).is_ready() {
-                if result.is_pending() {
-                    result = Poll::Ready(());
-                }
+            if Pin::new(component).poll_next_state(cx).is_ready() && result.is_pending() {
+                result = Poll::Ready(());
             }
         }
 
