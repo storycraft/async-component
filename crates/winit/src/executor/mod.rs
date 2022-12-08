@@ -11,13 +11,14 @@ use std::{
 };
 
 use async_component_core::AsyncComponent;
-use ref_extended::pin_ref_extended;
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},
 };
 
 use crate::WinitComponent;
+
+use ref_extended::ref_extended;
 
 use self::signal::WinitSignal;
 
@@ -94,37 +95,38 @@ impl WinitExecutor {
     pub fn run(mut self, mut component: impl AsyncComponent + WinitComponent + 'static) -> ! {
         let event_loop = self.event_loop.take().unwrap();
 
-        pin_ref_extended!(executor, self);
+        let executor = self;
+        ref_extended!(|&executor| {
+            event_loop.run(move |event, _, control_flow| {
+                match event {
+                    Event::MainEventsCleared => {
+                        component.on_event(&mut Event::MainEventsCleared, control_flow);
 
-        event_loop.run(move |event, _, control_flow| {
-            match event {
-                Event::MainEventsCleared => {
-                    component.on_event(&mut Event::MainEventsCleared, control_flow);
+                        if let ControlFlow::ExitWithCode(_) = control_flow {
+                            return;
+                        }
 
-                    if let ControlFlow::ExitWithCode(_) = control_flow {
-                        return;
+                        executor.poll_stream(&mut component);
+
+                        match executor.poll_state(&mut component) {
+                            Poll::Ready(_) => {
+                                control_flow.set_poll();
+                            }
+                            Poll::Pending => {
+                                control_flow.set_wait();
+                            }
+                        }
                     }
 
-                    executor.poll_stream(&mut component);
+                    // Handled in Event::MainEventsCleared
+                    Event::UserEvent(_) => {}
 
-                    match executor.poll_state(&mut component) {
-                        Poll::Ready(_) => {
-                            control_flow.set_poll();
-                        }
-                        Poll::Pending => {
-                            control_flow.set_wait();
-                        }
+                    _ => {
+                        component.on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
                     }
                 }
-
-                // Handled in Event::MainEventsCleared
-                Event::UserEvent(_) => {}
-
-                _ => {
-                    component.on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
-                }
-            }
-        })
+            })
+        });
     }
 }
 
