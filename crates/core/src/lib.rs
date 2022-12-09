@@ -19,26 +19,6 @@ pub trait AsyncComponent: Unpin {
     fn poll_next_stream(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()>;
 }
 
-impl<T: ?Sized + AsyncComponent> AsyncComponent for Box<T> {
-    fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        T::poll_next_state(Pin::new(&mut *self), cx)
-    }
-
-    fn poll_next_stream(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        T::poll_next_stream(Pin::new(&mut *self), cx)
-    }
-}
-
-impl<T: ?Sized + AsyncComponent> AsyncComponent for &mut T {
-    fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        T::poll_next_state(Pin::new(*self), cx)
-    }
-
-    fn poll_next_stream(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        T::poll_next_stream(Pin::new(*self), cx)
-    }
-}
-
 pub trait AsyncComponentExt {
     fn next(&mut self) -> Next<Self>;
 
@@ -103,8 +83,6 @@ impl<T: AsyncComponent> Future for NextStream<'_, T> {
         Pin::new(&mut *self.0).poll_next_stream(cx)
     }
 }
-
-pub type PhantomState = StateCell<()>;
 
 /// Track change of value and notify the Executor.
 /// This struct has no method and implements [`Deref`], [`DerefMut`].
