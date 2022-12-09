@@ -1,8 +1,6 @@
 mod env;
 
-use async_component::{
-    components::option::OptionComponent, AsyncComponent, PhantomState, StateCell,
-};
+use async_component::{components::option::OptionComponent, AsyncComponent, StateCell};
 use async_component_winit::WinitComponent;
 use env::{AppContainer, AppElement};
 use raqote::{DrawOptions, DrawTarget, SolidSource, Source};
@@ -44,10 +42,6 @@ pub struct App {
     // Cursor square
     #[component]
     cursor: Square,
-
-    // A component must have atleast one state to able to track changes of component. it is for that.
-    #[state]
-    _phantom: PhantomState,
 }
 
 impl App {
@@ -64,8 +58,6 @@ impl App {
                     a: 0xff,
                 }),
             ),
-
-            _phantom: Default::default(),
         }
     }
 }

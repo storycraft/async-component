@@ -24,8 +24,10 @@ impl WinitSignal {
 
 impl WinitSignal {
     pub fn wake_by_ref(&self) {
-        if self.scheduled
-                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_ok()
+        if self
+            .scheduled
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
         {
             self.proxy.lock().send_event(ExecutorPollEvent).ok();
         }

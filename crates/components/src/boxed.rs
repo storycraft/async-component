@@ -1,6 +1,7 @@
 use std::{
+    ops::{Deref, DerefMut},
     pin::Pin,
-    task::{Context, Poll}, ops::{Deref, DerefMut},
+    task::{Context, Poll},
 };
 
 use async_component_core::{AsyncComponent, StateCell};
@@ -54,8 +55,7 @@ impl<T: ?Sized + AsyncComponent> AsyncComponent for BoxedComponent<T> {
             poll = Poll::Ready(());
         }
 
-        if StateCell::poll_state(Pin::new(&mut self.changed), cx).is_ready() && poll.is_pending()
-        {
+        if StateCell::poll_state(Pin::new(&mut self.changed), cx).is_ready() && poll.is_pending() {
             poll = Poll::Ready(());
         }
 

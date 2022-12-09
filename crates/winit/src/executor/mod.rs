@@ -53,12 +53,12 @@ impl WinitExecutor {
     }
 
     fn poll_stream(&'static self, component: &mut impl AsyncComponent) {
-        if self.stream_signal.scheduled.compare_exchange(
-            true,
-            false,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ).is_ok() {
+        if self
+            .stream_signal
+            .scheduled
+            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
             while let Poll::Ready(_) =
                 Pin::new(&mut *component).poll_next_stream(&mut Context::from_waker(&unsafe {
                     Waker::from_raw(create_raw_waker(&self.stream_signal))
@@ -68,12 +68,12 @@ impl WinitExecutor {
     }
 
     fn poll_state(&'static self, component: &mut impl AsyncComponent) -> Poll<()> {
-        if self.state_signal.scheduled.compare_exchange(
-            true,
-            false,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ).is_ok() {
+        if self
+            .state_signal
+            .scheduled
+            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
             if Pin::new(component)
                 .poll_next_state(&mut Context::from_waker(&unsafe {
                     Waker::from_raw(create_raw_waker(&self.state_signal))
