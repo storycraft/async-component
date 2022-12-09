@@ -51,19 +51,19 @@ impl<T: AsyncComponent> OptionComponent<T> {
 
 impl<T: AsyncComponent> AsyncComponent for OptionComponent<T> {
     fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        let mut result = Poll::Pending;
-
-        if StateCell::poll_state(Pin::new(&mut self.assigned), cx).is_ready() {
-            result = Poll::Ready(());
-        }
+        let mut poll = Poll::Pending;
 
         if let Some(ref mut component) = self.component {
-            if Pin::new(component).poll_next_state(cx).is_ready() && result.is_pending() {
-                result = Poll::Ready(());
+            if Pin::new(component).poll_next_state(cx).is_ready() && poll.is_pending() {
+                poll = Poll::Ready(());
             }
         }
 
-        result
+        if StateCell::poll_state(Pin::new(&mut self.assigned), cx).is_ready() && poll.is_pending() {
+            poll = Poll::Ready(());
+        }
+
+        poll
     }
 
     fn poll_next_stream(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {

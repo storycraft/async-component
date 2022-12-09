@@ -48,18 +48,18 @@ impl<T: ?Sized> From<Box<T>> for BoxedComponent<T> {
 
 impl<T: ?Sized + AsyncComponent> AsyncComponent for BoxedComponent<T> {
     fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        let mut result = Poll::Pending;
+        let mut poll = Poll::Pending;
 
         if Pin::new(&mut *self.inner).poll_next_state(cx).is_ready() {
-            result = Poll::Ready(());
+            poll = Poll::Ready(());
         }
 
-        if StateCell::poll_state(Pin::new(&mut self.changed), cx).is_ready() && result.is_pending()
+        if StateCell::poll_state(Pin::new(&mut self.changed), cx).is_ready() && poll.is_pending()
         {
-            result = Poll::Ready(());
+            poll = Poll::Ready(());
         }
 
-        result
+        poll
     }
 
     fn poll_next_stream(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {

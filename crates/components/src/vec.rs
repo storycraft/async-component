@@ -117,30 +117,30 @@ impl<T: AsyncComponent> IntoIterator for VecComponent<T> {
 
 impl<T: AsyncComponent> AsyncComponent for VecComponent<T> {
     fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        let mut result = Poll::Pending;
-
-        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() {
-            result = Poll::Ready(());
-        }
+        let mut poll = Poll::Pending;
 
         for component in &mut self.vec {
-            if Pin::new(component).poll_next_state(cx).is_ready() && result.is_pending() {
-                result = Poll::Ready(());
+            if Pin::new(component).poll_next_state(cx).is_ready() && poll.is_pending() {
+                poll = Poll::Ready(());
             }
         }
 
-        result
+        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() && poll.is_pending() {
+            poll = Poll::Ready(());
+        }
+
+        poll
     }
 
     fn poll_next_stream(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        let mut result = Poll::Pending;
+        let mut poll = Poll::Pending;
 
         for component in &mut self.vec {
-            if Pin::new(component).poll_next_stream(cx).is_ready() && result.is_pending() {
-                result = Poll::Ready(());
+            if Pin::new(component).poll_next_stream(cx).is_ready() && poll.is_pending() {
+                poll = Poll::Ready(());
             }
         }
 
-        result
+        poll
     }
 }

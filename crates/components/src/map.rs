@@ -150,14 +150,14 @@ impl<K: Eq + Hash + Unpin, V: Unpin + AsyncComponent, S: Unpin> AsyncComponent
     fn poll_next_state(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
         let mut poll = Poll::Pending;
 
-        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() {
-            poll = Poll::Ready(());
-        }
-
         for component in self.map.values_mut() {
             if Pin::new(component).poll_next_state(cx).is_ready() && poll.is_pending() {
                 poll = Poll::Ready(());
             }
+        }
+
+        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() && poll.is_pending() {
+            poll = Poll::Ready(());
         }
 
         poll
