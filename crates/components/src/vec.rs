@@ -10,21 +10,21 @@ use async_component_core::{AsyncComponent, StateCell};
 
 #[derive(Debug)]
 pub struct VecComponent<T> {
-    updated: StateCell<()>,
+    length_updated: StateCell<()>,
     vec: Vec<T>,
 }
 
 impl<T: AsyncComponent> VecComponent<T> {
     pub const fn new() -> Self {
         Self {
-            updated: StateCell::new(()),
+            length_updated: StateCell::new(()),
             vec: Vec::new(),
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            updated: StateCell::new(()),
+            length_updated: StateCell::new(()),
             vec: Vec::with_capacity(capacity),
         }
     }
@@ -35,39 +35,43 @@ impl<T: AsyncComponent> VecComponent<T> {
 
     pub fn remove(&mut self, index: usize) {
         self.vec.remove(index);
-        StateCell::invalidate(&mut self.updated);
+        StateCell::invalidate(&mut self.length_updated);
     }
 
     pub fn push(&mut self, component: T) {
         self.vec.push(component);
-        StateCell::invalidate(&mut self.updated);
+        StateCell::invalidate(&mut self.length_updated);
     }
 
     pub fn append(&mut self, other: &mut Vec<T>) {
-        self.vec.append(other);
-        StateCell::invalidate(&mut self.updated);
+        self.watch_len_changes(move |this| {
+            this.vec.append(other);
+        });
     }
 
     pub fn pop(&mut self) -> Option<()> {
         self.vec.pop()?;
-        StateCell::invalidate(&mut self.updated);
+        StateCell::invalidate(&mut self.length_updated);
 
         Some(())
     }
 
     pub fn drain(&mut self, range: impl RangeBounds<usize>) {
-        self.vec.drain(range);
-        StateCell::invalidate(&mut self.updated);
+        self.watch_len_changes(move |this| {
+            this.vec.drain(range);
+        });
     }
 
     pub fn retain(&mut self, f: impl FnMut(&T) -> bool) {
-        self.vec.retain(f);
-        StateCell::invalidate(&mut self.updated);
+        self.watch_len_changes(move |this| {
+            this.vec.retain(f);
+        });
     }
 
     pub fn clear(&mut self) {
-        self.vec.clear();
-        StateCell::invalidate(&mut self.updated);
+        self.watch_len_changes(|this| {
+            this.vec.clear();
+        });
     }
 
     pub fn iter(&self) -> Iter<T> {
@@ -76,6 +80,16 @@ impl<T: AsyncComponent> VecComponent<T> {
 
     pub fn iter_mut(&mut self) -> IterMut<T> {
         self.vec.iter_mut()
+    }
+
+    fn watch_len_changes(&mut self, func: impl FnOnce(&mut Self)) {
+        let original_len = self.vec.len();
+        func(self);
+        let len = self.vec.len();
+
+        if original_len != len {
+            StateCell::invalidate(&mut self.length_updated);
+        }
     }
 }
 
@@ -125,7 +139,7 @@ impl<T: AsyncComponent> AsyncComponent for VecComponent<T> {
             }
         }
 
-        if StateCell::poll_state(Pin::new(&mut self.updated), cx).is_ready() && poll.is_pending() {
+        if StateCell::poll_state(Pin::new(&mut self.length_updated), cx).is_ready() && poll.is_pending() {
             poll = Poll::Ready(());
         }
 
