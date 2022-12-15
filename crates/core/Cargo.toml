@@ -3,7 +3,7 @@ name = "async-component-core"
 description = "Zero overhead reactive programming"
 keywords = ["asynchronous", "reactive", "stream"]
 categories = ["asynchronous"]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 readme = "README.md"
 

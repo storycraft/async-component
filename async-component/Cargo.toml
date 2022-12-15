@@ -3,7 +3,7 @@ name = "async-component"
 description = "Zero overhead reactive programming"
 keywords = ["asynchronous", "reactive", "stream"]
 categories = ["asynchronous"]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 readme = "../readme.md"
 
@@ -14,9 +14,9 @@ license = "Apache-2.0"
 repository = "https://github.com/storycraft/async-component"
 
 [dependencies]
-async-component-core = { version = "0.6.0", path = "../crates/core" }
-async-component-macro = { version = "0.6.0", path = "../crates/macro" }
-async-component-components = { version = "0.6.0", path = "../crates/components" }
+async-component-core = { version = "0.7.0", path = "../crates/core" }
+async-component-macro = { version = "0.7.0", path = "../crates/macro" }
+async-component-components = { version = "0.7.0", path = "../crates/components" }
 
 [dev-dependencies]
 futures = "0.3.25"
