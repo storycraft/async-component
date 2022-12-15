@@ -1,6 +1,8 @@
 mod env;
 
-use async_component::{ AsyncComponent, StateCell, context::StateContext};
+use async_component::{
+    components::option::OptionComponent, context::StateContext, AsyncComponent, StateCell,
+};
 use async_component_winit::WinitComponent;
 use env::{AppContainer, AppElement};
 use raqote::{DrawOptions, DrawTarget, SolidSource, Source};
@@ -28,13 +30,17 @@ fn main() {
     window.set_cursor_visible(false);
 
     // Start winit eventloop and run Executor using async_component_winit crate
-    async_component_winit::run(event_loop, |cx| {
-        AppContainer::new(window, App::new(cx))
-    });
+    async_component_winit::run(event_loop, |cx| AppContainer::new(window, App::new(cx)));
 }
 
 #[derive(AsyncComponent)]
 pub struct App {
+    cx: StateContext,
+
+    // Optional component
+    #[component]
+    center_box: OptionComponent<Square>,
+
     // Cursor square
     #[component]
     cursor: Square,
@@ -43,6 +49,10 @@ pub struct App {
 impl App {
     pub fn new(cx: &StateContext) -> Self {
         Self {
+            cx: cx.clone(),
+
+            center_box: OptionComponent(None),
+
             cursor: Square::new(
                 cx,
                 (0.0, 0.0),
@@ -61,6 +71,10 @@ impl App {
 impl AppElement for App {
     // Draw children elements
     fn draw(&self, target: &mut DrawTarget) {
+        if let Some(ref center_box) = *self.center_box {
+            center_box.draw(target);
+        }
+
         self.cursor.draw(target);
     }
 }
@@ -85,7 +99,17 @@ impl WinitComponent for App {
                     },
                 ..
             } => {
-                
+                *self.center_box = Some(Square::new(
+                    &self.cx,
+                    *self.cursor.position,
+                    (100.0, 100.0),
+                    Source::Solid(SolidSource {
+                        r: 0xff,
+                        g: 0x00,
+                        b: 0xff,
+                        a: 0xff,
+                    }),
+                ));
             }
 
             // Take center_box element on right click
@@ -97,6 +121,7 @@ impl WinitComponent for App {
                     },
                 ..
             } => {
+                *self.center_box = None;
             }
 
             _ => {}
@@ -118,7 +143,12 @@ pub struct Square {
 }
 
 impl Square {
-    pub fn new(cx: &StateContext, position: (f32, f32), size: (f32, f32), source: Source<'static>) -> Self {
+    pub fn new(
+        cx: &StateContext,
+        position: (f32, f32),
+        size: (f32, f32),
+        source: Source<'static>,
+    ) -> Self {
         Self {
             position: StateCell::new(cx.clone(), position),
             size: StateCell::new(cx.clone(), size),

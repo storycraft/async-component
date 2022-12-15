@@ -32,9 +32,7 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
         Data::Struct(ref data) => {
             let state_update_call = extract_path_attribute("component", &input.attrs).map(|path| {
                 quote! {
-                    if updated {
-                        #path(self);
-                    }
+                    #path(self);
                 }
             });
 
@@ -163,9 +161,9 @@ fn field_component_update_body(
     let update = update_result();
     quote_spanned! { name.span() =>
         if ::async_component::AsyncComponent::update_component(&mut self.#name) {
-            #method_call
             #update
         }
+        #method_call
     }
 }
 fn update_result() -> TokenStream {
