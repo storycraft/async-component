@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+/*
 pub mod boxed;
 pub mod map;
 pub mod option;
@@ -11,3 +12,5 @@ pub use map::HashMapComponent;
 pub use option::OptionComponent;
 pub use suspense::SuspenseComponent;
 pub use vec::VecComponent;
+
+*/

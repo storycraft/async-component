@@ -1,9 +1,9 @@
 #![doc = include_str!("../README.md")]
 
-pub mod components;
+// pub mod components;
 pub mod executor;
 
-use async_component_core::AsyncComponent;
+use async_component_core::{AsyncComponent, context::StateContext};
 use executor::{ExecutorPollEvent, WinitExecutor};
 use winit::{
     event::Event,
@@ -16,11 +16,11 @@ pub trait WinitComponent {
 }
 
 /// Convenience method for initializing executor and running winit eventloop
-pub fn run(
+pub fn run<C: AsyncComponent + WinitComponent + 'static>(
     event_loop: EventLoop<ExecutorPollEvent>,
-    component: impl AsyncComponent + WinitComponent + 'static,
+    func: impl FnOnce(&StateContext) -> C,
 ) -> ! {
     let executor = WinitExecutor::new(event_loop);
 
-    executor.run(component)
+    executor.run(func)
 }

@@ -5,12 +5,15 @@ pub mod signal;
 mod wasm;
 
 use std::{
-    pin::Pin,
     sync::atomic::Ordering,
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 
-use async_component_core::AsyncComponent;
+use async_component_core::{
+    context::{ComponentStream, StateContext},
+    AsyncComponent,
+};
+use futures::StreamExt;
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},
@@ -35,50 +38,34 @@ pub struct WinitExecutor {
     event_loop: Option<EventLoop<ExecutorPollEvent>>,
 
     state_signal: WinitSignal,
-    stream_signal: WinitSignal,
 }
 
 impl WinitExecutor {
     /// Create new [`WinitExecutor`]
     pub fn new(event_loop: EventLoop<ExecutorPollEvent>) -> Self {
         let state_signal = WinitSignal::new(event_loop.create_proxy());
-        let stream_signal = WinitSignal::new(event_loop.create_proxy());
 
         Self {
             event_loop: Some(event_loop),
 
             state_signal,
-            stream_signal,
         }
     }
 
-    fn poll_stream(&'static self, component: &mut impl AsyncComponent) {
-        if self
-            .stream_signal
-            .scheduled
-            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
-            .is_ok()
-        {
-            while let Poll::Ready(_) =
-                Pin::new(&mut *component).poll_next_stream(&mut Context::from_waker(&unsafe {
-                    Waker::from_raw(create_raw_waker(&self.stream_signal))
-                }))
-            {}
-        }
-    }
-
-    fn poll_state(&'static self, component: &mut impl AsyncComponent) -> Poll<()> {
+    fn poll_component(
+        &'static self,
+        component_stream: &mut ComponentStream<impl AsyncComponent>,
+    ) -> Poll<()> {
         if self
             .state_signal
             .scheduled
             .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
             .is_ok()
         {
-            if Pin::new(component)
-                .poll_next_state(&mut Context::from_waker(&unsafe {
+            if let Poll::Ready(Some(_)) =
+                component_stream.poll_next_unpin(&mut Context::from_waker(&unsafe {
                     Waker::from_raw(create_raw_waker(&self.state_signal))
                 }))
-                .is_ready()
             {
                 self.state_signal.scheduled.store(true, Ordering::Release);
             }
@@ -92,22 +79,27 @@ impl WinitExecutor {
     /// Initializes the winit event loop and run component.
     ///
     /// See [`EventLoop`] for more detail about winit event loop
-    pub fn run(mut self, mut component: impl AsyncComponent + WinitComponent + 'static) -> ! {
+    pub fn run<C: AsyncComponent + WinitComponent + 'static>(
+        mut self,
+        func: impl FnOnce(&StateContext) -> C,
+    ) -> ! {
         let event_loop = self.event_loop.take().unwrap();
+
+        let mut stream = ComponentStream::new(func);
 
         let executor = self;
         ref_extended!(|&executor| event_loop.run(move |event, _, control_flow| {
             match event {
                 Event::MainEventsCleared => {
-                    component.on_event(&mut Event::MainEventsCleared, control_flow);
+                    stream
+                        .component_mut()
+                        .on_event(&mut Event::MainEventsCleared, control_flow);
 
                     if let ControlFlow::ExitWithCode(_) = control_flow {
                         return;
                     }
 
-                    executor.poll_stream(&mut component);
-
-                    match executor.poll_state(&mut component) {
+                    match executor.poll_component(&mut stream) {
                         Poll::Ready(_) => {
                             control_flow.set_poll();
                         }
@@ -121,7 +113,9 @@ impl WinitExecutor {
                 Event::UserEvent(_) => {}
 
                 _ => {
-                    component.on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
+                    stream
+                        .component_mut()
+                        .on_event(&mut event.map_nonuser_event().unwrap(), control_flow);
                 }
             }
         }))

@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use async_component::{AsyncComponent, AsyncComponentExt, StateCell};
-use futures::{
-    channel::mpsc::{channel, Receiver},
-    SinkExt,
+use async_component::{
+    context::{ComponentStream, StateContext},
+    AsyncComponent, StateCell, StreamCell,
 };
+use futures::{StreamExt, channel::mpsc::{Receiver, channel}, SinkExt};
 use tokio::time::sleep;
 
 #[tokio::main]
@@ -23,12 +23,14 @@ async fn main() {
     });
 
     // Run LoginForm component
-    run(LoginForm {
-        id: "user".to_string().into(),
-        password: "1234".to_string().into(),
+    run(|cx| LoginForm {
+        id: StateCell::new(cx.clone(), "user".to_string()),
+        password: StateCell::new(cx.clone(), "1234".to_string()),
 
-        sub_component: CounterComponent { counter: 0.into() },
-        counter_recv: recv,
+        sub_component: CounterComponent {
+            counter: StateCell::new(cx.clone(), 0),
+        },
+        counter_recv: StreamCell::new(cx.clone(), recv),
     })
     .await;
 }
@@ -39,12 +41,11 @@ trait Drawable {
 
 // Run function
 // Wait component for update and redraw each time updated.
-async fn run(mut component: impl AsyncComponent + Drawable) {
-    loop {
-        component.next().await;
+async fn run<C: AsyncComponent + Drawable>(func: impl FnOnce(&StateContext) -> C) {
+    let mut stream = ComponentStream::new(func);
 
-        // Redraw since last render is invalid
-        component.draw();
+    while let Some(_) = stream.next().await {
+        stream.component().draw();
     }
 }
 
@@ -77,18 +78,18 @@ struct LoginForm {
     #[component]
     sub_component: CounterComponent,
 
-    #[stream(Self::on_counter_recv)]
-    counter_recv: Receiver<i32>,
+    #[state(Self::on_counter_recv)]
+    counter_recv: StreamCell<Receiver<i32>>,
 }
 
 impl LoginForm {
     // Print message if self.id updated
-    fn on_id_update(&mut self) {
+    fn on_id_update(&mut self, _: ()) {
         println!("Id updated: {}", *self.id);
     }
 
     // Print message if self.password updated
-    fn on_password_update(&mut self) {
+    fn on_password_update(&mut self, _: ()) {
         println!("Password updated: {}", *self.password);
     }
 

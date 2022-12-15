@@ -3,85 +3,26 @@
 #[doc(hidden)]
 #[path = "exports.rs"]
 pub mod __private;
+pub mod context;
 
-use futures_core::Future;
+use context::StateContext;
+use futures_core::Stream;
 
 use std::{
     ops::{Deref, DerefMut},
     pin::Pin,
-    task::{Context, Poll, Waker},
+    task::{Context, Poll},
 };
 
 /// Core trait
-pub trait AsyncComponent: Unpin {
-    fn poll_next_state(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()>;
-
-    fn poll_next_stream(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()>;
+pub trait AsyncComponent {
+    fn update_component(&mut self) -> bool;
 }
 
-pub trait AsyncComponentExt {
-    fn next(&mut self) -> Next<Self>;
+pub trait State {
+    type Output;
 
-    fn next_state(&mut self) -> NextState<Self>;
-
-    fn next_stream(&mut self) -> NextStream<Self>;
-}
-
-#[derive(Debug)]
-pub struct Next<'a, T: ?Sized>(&'a mut T);
-
-impl<T: AsyncComponent> Future for Next<'_, T> {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut result = Poll::Pending;
-
-        if Pin::new(&mut *self.0).poll_next_stream(cx).is_ready() {
-            result = Poll::Ready(());
-        }
-
-        if Pin::new(&mut *self.0).poll_next_state(cx).is_ready() {
-            result = Poll::Ready(());
-        }
-
-        result
-    }
-}
-
-impl<T: AsyncComponent> AsyncComponentExt for T {
-    fn next(&mut self) -> Next<Self> {
-        Next(self)
-    }
-
-    fn next_state(&mut self) -> NextState<Self> {
-        NextState(self)
-    }
-
-    fn next_stream(&mut self) -> NextStream<Self> {
-        NextStream(self)
-    }
-}
-
-#[derive(Debug)]
-pub struct NextState<'a, T: ?Sized>(&'a mut T);
-
-impl<T: AsyncComponent> Future for NextState<'_, T> {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut *self.0).poll_next_state(cx)
-    }
-}
-
-#[derive(Debug)]
-pub struct NextStream<'a, T: ?Sized>(&'a mut T);
-
-impl<T: AsyncComponent> Future for NextStream<'_, T> {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut *self.0).poll_next_stream(cx)
-    }
+    fn update(this: &mut Self) -> Option<Self::Output>;
 }
 
 /// Track change of value and notify the Executor.
@@ -90,15 +31,19 @@ impl<T: AsyncComponent> Future for NextStream<'_, T> {
 /// This will also wake pending task when the cell is dropped.
 #[derive(Debug)]
 pub struct StateCell<T> {
-    status: StateStatus,
+    cx: StateContext,
+    changed: bool,
     inner: T,
 }
 
 impl<T> StateCell<T> {
     /// Create new [`StateCell`]
-    pub const fn new(inner: T) -> Self {
+    pub fn new(cx: StateContext, inner: T) -> Self {
+        cx.signal();
+
         Self {
-            status: StateStatus::Changed,
+            cx,
+            changed: true,
             inner,
         }
     }
@@ -106,45 +51,11 @@ impl<T> StateCell<T> {
     /// Invalidate this [`StateCell`].
     /// It wakes task if there is any waker pending.
     pub fn invalidate(this: &mut Self) {
-        match this.status {
-            StateStatus::None => {
-                this.status = StateStatus::Changed;
-            }
-
-            StateStatus::Pending(ref waker) => {
-                waker.wake_by_ref();
-                this.status = StateStatus::Changed;
-            }
-
-            StateStatus::Changed => {}
+        if !this.changed {
+            this.changed = true;
         }
-    }
 
-    /// Check if there are any changes or saves waker to wake task to notify when the value is changed.
-    pub fn poll_state(mut this: Pin<&mut Self>, cx: &mut Context) -> Poll<()>
-    where
-        Self: Unpin,
-    {
-        match this.status {
-            StateStatus::None => {
-                this.status = StateStatus::Pending(cx.waker().clone());
-
-                Poll::Pending
-            }
-
-            StateStatus::Pending(ref old_waker) => {
-                if !old_waker.will_wake(cx.waker()) {
-                    this.status = StateStatus::Pending(cx.waker().clone());
-                }
-
-                Poll::Pending
-            }
-
-            StateStatus::Changed => {
-                this.status = StateStatus::None;
-                Poll::Ready(())
-            }
-        }
+        this.cx.signal()
     }
 }
 
@@ -164,35 +75,52 @@ impl<T> DerefMut for StateCell<T> {
     }
 }
 
-impl<T> From<T> for StateCell<T> {
-    fn from(value: T) -> Self {
-        Self::new(value)
-    }
-}
+impl<T> State for StateCell<T> {
+    type Output = ();
 
-impl<T: Default> Default for StateCell<T> {
-    fn default() -> Self {
-        Self::new(Default::default())
+    fn update(this: &mut Self) -> Option<Self::Output> {
+        if this.changed {
+            this.changed = false;
+            Some(())
+        } else {
+            None
+        }
     }
 }
 
 impl<T> Drop for StateCell<T> {
     fn drop(&mut self) {
-        if let StateStatus::Pending(ref waker) = self.status {
-            waker.wake_by_ref();
+        self.cx.signal();
+    }
+}
+
+#[derive(Debug)]
+pub struct StreamCell<T> {
+    cx: StateContext,
+    inner: T,
+}
+
+impl<T: Stream> StreamCell<T> {
+    pub fn new(cx: StateContext, inner: T) -> Self {
+        cx.signal();
+
+        Self { cx, inner }
+    }
+}
+
+impl<T: Stream + Unpin> State for StreamCell<T> {
+    type Output = T::Item;
+
+    fn update(this: &mut Self) -> Option<Self::Output> {
+        match Pin::new(&mut this.inner).poll_next(&mut Context::from_waker(this.cx.waker())) {
+            Poll::Ready(Some(output)) => Some(output),
+            _ => None,
         }
     }
 }
 
-#[derive(Debug, Clone)]
-enum StateStatus {
-    None,
-    Pending(Waker),
-    Changed,
-}
-
-impl Default for StateStatus {
-    fn default() -> Self {
-        Self::None
+impl<T> Drop for StreamCell<T> {
+    fn drop(&mut self) {
+        self.cx.signal();
     }
 }
