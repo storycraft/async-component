@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.md")]
 
-// pub mod components;
 pub mod executor;
 
 use async_component_core::{AsyncComponent, context::StateContext};
