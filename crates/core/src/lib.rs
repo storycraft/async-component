@@ -25,10 +25,10 @@ pub trait State {
     fn update(this: &mut Self) -> Option<Self::Output>;
 }
 
-/// Track change of value and notify the Executor.
+/// Track change of value and signal to [`StateContext`].
 /// This struct has no method and implements [`Deref`], [`DerefMut`].
-/// When inner value is mutable dereferenced, it changes status and wake pending task.
-/// This will also wake pending task when the cell is dropped.
+/// When inner value is mutable dereferenced, it is marked changed and send signal.
+/// This will also send signal when the cell is constructed or dropped.
 #[derive(Debug)]
 pub struct StateCell<T> {
     cx: StateContext,
@@ -37,7 +37,7 @@ pub struct StateCell<T> {
 }
 
 impl<T> StateCell<T> {
-    /// Create new [`StateCell`]
+    /// Create new [`StateCell`] with [`StateContext`]
     pub fn new(cx: StateContext, inner: T) -> Self {
         cx.signal();
 
@@ -49,7 +49,7 @@ impl<T> StateCell<T> {
     }
 
     /// Invalidate this [`StateCell`].
-    /// It wakes task if there is any waker pending.
+    /// Send signal to context.
     pub fn invalidate(this: &mut Self) {
         if !this.changed {
             this.changed = true;
@@ -94,6 +94,7 @@ impl<T> Drop for StateCell<T> {
     }
 }
 
+/// State which polls inner stream
 #[derive(Debug)]
 pub struct StreamCell<T> {
     cx: StateContext,

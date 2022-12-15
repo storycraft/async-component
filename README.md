@@ -19,12 +19,12 @@ struct CounterComponent {
     // Stream
     // It iterates every queued items in single poll to prevent slowdown.
     // If the stream is immediate and resolves indefinitely, the task will fall to infinite loop. See expanded code below.
-    #[stream(Self::on_counter_recv)]
-    counter_recv: Receiver<i32>,
+    #[state(Self::on_counter_recv)]
+    counter_recv: StreamCell<Receiver<i32>>,
 }
 
 impl CounterComponent {
-    fn on_counter_update(&mut self) {
+    fn on_counter_update(&mut self, _: ()) {
         println!("Counter updated to: {}", *self.counter);
     }
 
@@ -38,41 +38,4 @@ Running this component stream will print initial value first and print changed v
 ```
 Counter updated to: 0
 Counter updated to: ...
-```
-
-### Expanded
-`Component` derive macro will generate `AsyncComponent` trait implementation for `CounterComponent` like below.
-```Rust
-impl AsyncComponent for CounterComponent {
-    fn poll_next_state(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        let mut result = Poll::Pending;
-
-        if StateCell::poll_state(
-            Pin::new(&mut self.counter),
-            cx
-        ) {
-            Self::on_counter_update(&mut self);
-
-            if result.is_pending() {
-                result = Poll::Ready(());
-            }
-        }
-
-       result
-    }
-
-    fn poll_next_stream(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
-        let mut result = Poll::Pending;
-
-        if let Poll::Ready(Some(recv)) = Stream::poll_next(Pin::new(&mut self.counter_recv), cx) {
-            Self::on_counter_recv(&mut self, recv);
-
-            if result.is_pending() {
-                result = Poll::Ready(());
-            }
-        }
-
-        result
-    }
-}
 ```
