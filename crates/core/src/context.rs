@@ -76,7 +76,7 @@ impl StateContext {
 }
 
 #[derive(Debug)]
-pub struct Inner {
+struct Inner {
     updated: AtomicBool,
     waker: AtomicWaker,
 }
