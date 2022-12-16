@@ -20,11 +20,9 @@ impl<T> DerefMut for OptionComponent<T> {
 }
 
 impl<T: AsyncComponent> AsyncComponent for OptionComponent<T> {
-    fn update_component(&mut self) -> bool {
+    fn update_component(&mut self) {
         if let Some(ref mut inner) = self.0 {
             inner.update_component()
-        } else {
-            false
         }
     }
 }

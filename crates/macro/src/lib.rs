@@ -40,15 +40,11 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
             let component_poll = component_update_body(&data.fields);
 
             quote! {
-                let mut updated = false;
-
                 #component_poll
 
                 #state_poll
 
                 #state_update_call
-
-                updated
             }
         }
         Data::Enum(_) => unimplemented!("Derive cannot be applied to enum"),
@@ -57,7 +53,7 @@ fn impl_component_stream(input: &DeriveInput) -> TokenStream {
 
     quote! {
         impl #impl_generics ::async_component::AsyncComponent for #name #ty_generics #where_clause {
-            fn update_component(&mut self) -> bool {
+            fn update_component(&mut self) {
                 #update_component_body
             }
         }
@@ -105,11 +101,9 @@ fn field_state_update_body(name: impl IdentFragment, method_name: Option<ExprPat
 
     let method_call = method_name.map(|path| quote! { #path(self, _recv); });
 
-    let update = update_result();
     quote_spanned! { name.span() =>
         if let Some(_recv) = ::async_component::State::update(&mut self.#name) {
             #method_call
-            #update
         }
     }
 }
@@ -158,18 +152,8 @@ fn field_component_update_body(
 
     let method_call = method_name.map(|path| quote! { #path(self); });
 
-    let update = update_result();
     quote_spanned! { name.span() =>
-        if ::async_component::AsyncComponent::update_component(&mut self.#name) {
-            #update
-        }
+        ::async_component::AsyncComponent::update_component(&mut self.#name);
         #method_call
-    }
-}
-fn update_result() -> TokenStream {
-    quote! {
-        if !updated {
-            updated = true
-        }
     }
 }

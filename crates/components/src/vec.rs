@@ -20,15 +20,9 @@ impl<T> DerefMut for VecComponent<T> {
 }
 
 impl<T: AsyncComponent> AsyncComponent for VecComponent<T> {
-    fn update_component(&mut self) -> bool {
-        let mut updated = false;
-
+    fn update_component(&mut self) {
         for component in &mut self.0 {
-            if component.update_component() && !updated {
-                updated = true;
-            }
+            component.update_component();
         }
-
-        updated
     }
 }

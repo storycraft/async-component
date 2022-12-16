@@ -16,7 +16,7 @@ use std::{
 
 /// Core trait
 pub trait AsyncComponent {
-    fn update_component(&mut self) -> bool;
+    fn update_component(&mut self);
 }
 
 pub trait State {

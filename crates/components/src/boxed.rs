@@ -20,7 +20,7 @@ impl<T: ?Sized> DerefMut for BoxedComponent<T> {
 }
 
 impl<T: ?Sized + AsyncComponent> AsyncComponent for BoxedComponent<T> {
-    fn update_component(&mut self) -> bool {
+    fn update_component(&mut self) {
         self.0.update_component()
     }
 }

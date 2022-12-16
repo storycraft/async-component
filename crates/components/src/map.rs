@@ -24,15 +24,9 @@ impl<K, V, S> DerefMut for HashMapComponent<K, V, S> {
 }
 
 impl<K: Eq + Hash, V: AsyncComponent, S> AsyncComponent for HashMapComponent<K, V, S> {
-    fn update_component(&mut self) -> bool {
-        let mut updated = false;
-
+    fn update_component(&mut self) {
         for value in self.0.values_mut() {
-            if value.update_component() && !updated {
-                updated = true;
-            }
+            value.update_component();
         }
-
-        updated
     }
 }
