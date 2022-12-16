@@ -15,7 +15,6 @@ repository = "https://github.com/storycraft/async-component"
 
 [dependencies]
 async-component-core = { version = "0.8.1", path = "../core" }
-async-component-components = { version = "0.8.1", path = "../components" }
 futures = "0.3"
 
 winit = "0.27.5"
