@@ -19,6 +19,8 @@ pub struct ComponentStream<C> {
 }
 
 impl<C: AsyncComponent> ComponentStream<C> {
+    
+    /// Create new [`ComponentStream`]
     pub fn new(func: impl FnOnce(&StateContext) -> C) -> Self {
         let cx = StateContext::new();
 
@@ -66,10 +68,12 @@ impl StateContext {
         StateContext { inner, waker }
     }
 
+    /// Signal context to wake
     pub fn signal(&self) {
         self.waker.wake_by_ref();
     }
 
+    /// Returns [`Context`] which can be used for polling future
     pub fn task_context<'a>(&'a self) -> Context<'a> {
         Context::from_waker(&self.waker)
     }

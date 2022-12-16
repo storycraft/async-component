@@ -19,6 +19,9 @@ pub trait AsyncComponent {
     fn update_component(&mut self);
 }
 
+/// State trait
+/// 
+/// Returns output if state is updated
 pub trait State {
     type Output;
 
