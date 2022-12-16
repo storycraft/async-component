@@ -2,7 +2,7 @@
 
 pub mod executor;
 
-use async_component_core::{AsyncComponent, context::StateContext};
+use async_component_core::{context::StateContext, AsyncComponent};
 use executor::{ExecutorPollEvent, WinitExecutor};
 use winit::{
     event::Event,

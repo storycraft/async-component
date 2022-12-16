@@ -19,7 +19,6 @@ pub struct ComponentStream<C> {
 }
 
 impl<C: AsyncComponent> ComponentStream<C> {
-    
     /// Create new [`ComponentStream`]
     pub fn new(func: impl FnOnce(&StateContext) -> C) -> Self {
         let cx = StateContext::new();

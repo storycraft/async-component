@@ -4,7 +4,10 @@ use async_component::{
     context::{ComponentStream, StateContext},
     AsyncComponent, StateCell, StreamCell,
 };
-use futures::{StreamExt, channel::mpsc::{Receiver, channel}, SinkExt};
+use futures::{
+    channel::mpsc::{channel, Receiver},
+    SinkExt, StreamExt,
+};
 use tokio::time::sleep;
 
 #[tokio::main]

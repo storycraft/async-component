@@ -20,7 +20,7 @@ pub trait AsyncComponent {
 }
 
 /// State trait
-/// 
+///
 /// Returns output if state is updated
 pub trait State {
     type Output;
