@@ -15,12 +15,13 @@ pub trait AppElement {
 
 // Container component which handles rendering on child changes.
 #[derive(Debug, AsyncComponent)]
+#[component(Self::on_update)]
 pub struct AppContainer<T: AppElement + WinitComponent + AsyncComponent> {
     window: Window,
 
     pixels: Pixels,
 
-    #[component(Self::on_update)]
+    #[component]
     component: T,
 }
 
@@ -43,7 +44,6 @@ impl<T: AppElement + WinitComponent + AsyncComponent> AppContainer<T> {
         }
     }
 
-    // Called on if any child component's states are updated.
     fn on_update(&mut self) {
         // Request redraw
         self.window.request_redraw();
