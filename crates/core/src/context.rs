@@ -14,17 +14,19 @@ use crate::AsyncComponent;
 
 #[derive(Debug)]
 pub struct ComponentStream<C> {
-    cx: StateContext,
+    inner: Arc<Inner>,
     component: C,
 }
 
 impl<C: AsyncComponent> ComponentStream<C> {
     /// Create new [`ComponentStream`]
     pub fn new(func: impl FnOnce(&StateContext) -> C) -> Self {
-        let cx = StateContext::new();
+        let inner = Arc::new(Inner::default());
 
+        let cx = StateContext::new(Waker::from(inner.clone()));
         let component = func(&cx);
-        Self { cx, component }
+
+        Self { inner, component }
     }
 
     pub fn component(&self) -> &C {
@@ -40,10 +42,10 @@ impl<C: AsyncComponent> Stream for ComponentStream<C> {
     type Item = ();
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<()>> {
-        self.cx.inner.waker.register(cx.waker());
+        self.inner.waker.register(cx.waker());
 
         self.component.update_component();
-        if self.cx.inner.updated.swap(false, Ordering::Relaxed) {
+        if self.inner.updated.swap(false, Ordering::Relaxed) {
             Poll::Ready(Some(()))
         } else {
             Poll::Pending
@@ -54,27 +56,21 @@ impl<C: AsyncComponent> Stream for ComponentStream<C> {
 impl<C: AsyncComponent> Unpin for ComponentStream<C> {}
 
 #[derive(Debug, Clone)]
-pub struct StateContext {
-    inner: Arc<Inner>,
-    waker: Waker,
-}
+pub struct StateContext(Waker);
 
 impl StateContext {
-    pub(crate) fn new() -> Self {
-        let inner = Arc::new(Inner::default());
-        let waker = Waker::from(inner.clone());
-
-        StateContext { inner, waker }
+    pub(crate) const fn new(waker: Waker) -> Self {
+        StateContext(waker)
     }
 
     /// Signal context to wake
     pub fn signal(&self) {
-        self.waker.wake_by_ref();
+        self.0.wake_by_ref();
     }
 
     /// Returns [`Context`] which can be used for polling future
     pub fn task_context<'a>(&'a self) -> Context<'a> {
-        Context::from_waker(&self.waker)
+        Context::from_waker(&self.0)
     }
 }
 
