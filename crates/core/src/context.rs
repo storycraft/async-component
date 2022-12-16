@@ -67,8 +67,7 @@ impl StateContext {
     }
 
     pub fn signal(&self) {
-        self.inner.updated.store(true, Ordering::Relaxed);
-        self.inner.waker.wake();
+        self.waker.wake_by_ref();
     }
 
     pub fn waker(&self) -> &Waker {
@@ -84,10 +83,11 @@ pub struct Inner {
 
 impl Wake for Inner {
     fn wake(self: Arc<Self>) {
-        self.waker.wake()
+        self.wake_by_ref()
     }
 
     fn wake_by_ref(self: &Arc<Self>) {
+        self.updated.store(true, Ordering::Relaxed);
         self.waker.wake()
     }
 }
