@@ -11,7 +11,7 @@ use futures_core::Stream;
 use std::{
     ops::{Deref, DerefMut},
     pin::Pin,
-    task::{Context, Poll},
+    task::Poll,
 };
 
 /// Core trait
@@ -113,7 +113,7 @@ impl<T: Stream + Unpin> State for StreamCell<T> {
     type Output = T::Item;
 
     fn update(this: &mut Self) -> Option<Self::Output> {
-        match Pin::new(&mut this.inner).poll_next(&mut Context::from_waker(this.cx.waker())) {
+        match Pin::new(&mut this.inner).poll_next(&mut this.cx.task_context()) {
             Poll::Ready(Some(output)) => Some(output),
             _ => None,
         }

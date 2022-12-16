@@ -70,8 +70,8 @@ impl StateContext {
         self.waker.wake_by_ref();
     }
 
-    pub fn waker(&self) -> &Waker {
-        &self.waker
+    pub fn task_context<'a>(&'a self) -> Context<'a> {
+        Context::from_waker(&self.waker)
     }
 }
 
