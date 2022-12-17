@@ -95,6 +95,12 @@ impl<T> From<T> for StateCell<T> {
     }
 }
 
+impl<T: Default> Default for StateCell<T> {
+    fn default() -> Self {
+        Self::new(Default::default())
+    }
+}
+
 impl<T> Drop for StateCell<T> {
     fn drop(&mut self) {
         current_context().signal();
@@ -128,6 +134,12 @@ impl<T: Stream + Unpin> State for StreamCell<T> {
 impl<T: Stream> From<T> for StreamCell<T> {
     fn from(inner: T) -> Self {
         Self::new(inner)
+    }
+}
+
+impl<T: Stream + Default> Default for StreamCell<T> {
+    fn default() -> Self {
+        Self::new(Default::default())
     }
 }
 
