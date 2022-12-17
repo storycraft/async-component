@@ -80,6 +80,8 @@ impl<C: AsyncComponent> ComponentStream<C> {
     }
 }
 
+impl<C: AsyncComponent> Unpin for ComponentStream<C> {}
+
 #[derive(Debug)]
 pub struct EnteredComponentStream<'a, C> {
     _guard: EnterContextGuard,
@@ -110,8 +112,6 @@ impl<C: AsyncComponent> Stream for EnteredComponentStream<'_, C> {
         }
     }
 }
-
-impl<C: AsyncComponent> Unpin for ComponentStream<C> {}
 
 #[derive(Debug, Clone)]
 pub struct StateContext(Waker);

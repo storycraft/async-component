@@ -1,8 +1,6 @@
 mod env;
 
-use async_component::{
-    components::option::OptionComponent, AsyncComponent, StateCell,
-};
+use async_component::{components::option::OptionComponent, AsyncComponent, StateCell};
 use async_component_winit::WinitComponent;
 use env::{AppContainer, AppElement};
 use raqote::{DrawOptions, DrawTarget, SolidSource, Source};
@@ -137,11 +135,7 @@ pub struct Square {
 }
 
 impl Square {
-    pub fn new(
-        position: (f32, f32),
-        size: (f32, f32),
-        source: Source<'static>,
-    ) -> Self {
+    pub fn new(position: (f32, f32), size: (f32, f32), source: Source<'static>) -> Self {
         Self {
             position: position.into(),
             size: size.into(),

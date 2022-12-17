@@ -27,9 +27,7 @@ async fn main() {
         id: "user".to_string().into(),
         password: "1234".to_string().into(),
 
-        sub_component: CounterComponent {
-            counter: 0.into(),
-        },
+        sub_component: CounterComponent { counter: 0.into() },
         counter_recv: recv.into(),
     })
     .await;
