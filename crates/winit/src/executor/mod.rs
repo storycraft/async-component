@@ -9,11 +9,8 @@ use std::{
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 
-use async_component_core::{
-    context::{ComponentStream, StateContext},
-    AsyncComponent,
-};
-use futures::StreamExt;
+use async_component_core::{context::ComponentStream, AsyncComponent};
+use futures::{Stream, StreamExt};
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},
@@ -52,10 +49,7 @@ impl WinitExecutor {
         }
     }
 
-    fn poll_component(
-        &'static self,
-        component_stream: &mut ComponentStream<impl AsyncComponent>,
-    ) -> Poll<()> {
+    fn poll_stream(&'static self, mut stream: impl Stream + Unpin) -> Poll<()> {
         if self
             .state_signal
             .scheduled
@@ -63,7 +57,7 @@ impl WinitExecutor {
             .is_ok()
         {
             if let Poll::Ready(Some(_)) =
-                component_stream.poll_next_unpin(&mut Context::from_waker(&unsafe {
+                stream.poll_next_unpin(&mut Context::from_waker(&unsafe {
                     Waker::from_raw(create_raw_waker(&self.state_signal))
                 }))
             {
@@ -81,7 +75,7 @@ impl WinitExecutor {
     /// See [`EventLoop`] for more detail about winit event loop
     pub fn run<C: AsyncComponent + WinitComponent + 'static>(
         mut self,
-        func: impl FnOnce(&StateContext) -> C,
+        func: impl FnOnce() -> C,
     ) -> ! {
         let event_loop = self.event_loop.take().unwrap();
 
@@ -89,6 +83,8 @@ impl WinitExecutor {
 
         let executor = self;
         ref_extended!(|&executor| event_loop.run(move |event, _, control_flow| {
+            let mut stream = stream.enter();
+
             match event {
                 Event::MainEventsCleared => {
                     stream
@@ -99,10 +95,11 @@ impl WinitExecutor {
                         return;
                     }
 
-                    match executor.poll_component(&mut stream) {
+                    match executor.poll_stream(&mut stream) {
                         Poll::Ready(_) => {
                             control_flow.set_poll();
                         }
+
                         Poll::Pending => {
                             control_flow.set_wait();
                         }

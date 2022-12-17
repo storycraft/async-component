@@ -1,7 +1,7 @@
 mod env;
 
 use async_component::{
-    components::option::OptionComponent, context::StateContext, AsyncComponent, StateCell,
+    components::option::OptionComponent, AsyncComponent, StateCell,
 };
 use async_component_winit::WinitComponent;
 use env::{AppContainer, AppElement};
@@ -30,13 +30,11 @@ fn main() {
     window.set_cursor_visible(false);
 
     // Start winit eventloop and run Executor using async_component_winit crate
-    async_component_winit::run(event_loop, |cx| AppContainer::new(window, App::new(cx)));
+    async_component_winit::run(event_loop, || AppContainer::new(window, App::new()));
 }
 
 #[derive(AsyncComponent)]
 pub struct App {
-    cx: StateContext,
-
     // Optional component
     #[component]
     center_box: OptionComponent<Square>,
@@ -47,14 +45,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(cx: &StateContext) -> Self {
+    pub fn new() -> Self {
         Self {
-            cx: cx.clone(),
-
             center_box: OptionComponent(None),
 
             cursor: Square::new(
-                cx,
                 (0.0, 0.0),
                 (20.0, 20.0),
                 Source::Solid(SolidSource {
@@ -100,7 +95,6 @@ impl WinitComponent for App {
                 ..
             } => {
                 *self.center_box = Some(Square::new(
-                    &self.cx,
                     *self.cursor.position,
                     (100.0, 100.0),
                     Source::Solid(SolidSource {
@@ -144,15 +138,14 @@ pub struct Square {
 
 impl Square {
     pub fn new(
-        cx: &StateContext,
         position: (f32, f32),
         size: (f32, f32),
         source: Source<'static>,
     ) -> Self {
         Self {
-            position: StateCell::new(cx.clone(), position),
-            size: StateCell::new(cx.clone(), size),
-            source: StateCell::new(cx.clone(), source),
+            position: position.into(),
+            size: size.into(),
+            source: source.into(),
         }
     }
 }

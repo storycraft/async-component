@@ -1,9 +1,6 @@
 use std::time::Duration;
 
-use async_component::{
-    context::{ComponentStream, StateContext},
-    AsyncComponent, StateCell, StreamCell,
-};
+use async_component::{context::ComponentStream, AsyncComponent, StateCell, StreamCell};
 use futures::{
     channel::mpsc::{channel, Receiver},
     SinkExt, StreamExt,
@@ -26,14 +23,14 @@ async fn main() {
     });
 
     // Run LoginForm component
-    run(|cx| LoginForm {
-        id: StateCell::new(cx.clone(), "user".to_string()),
-        password: StateCell::new(cx.clone(), "1234".to_string()),
+    run(|| LoginForm {
+        id: "user".to_string().into(),
+        password: "1234".to_string().into(),
 
         sub_component: CounterComponent {
-            counter: StateCell::new(cx.clone(), 0),
+            counter: 0.into(),
         },
-        counter_recv: StreamCell::new(cx.clone(), recv),
+        counter_recv: recv.into(),
     })
     .await;
 }
@@ -44,9 +41,10 @@ trait Drawable {
 
 // Run function
 // Wait component for update and redraw each time updated.
-async fn run<C: AsyncComponent + Drawable>(func: impl FnOnce(&StateContext) -> C) {
+async fn run<C: AsyncComponent + Drawable>(func: impl FnOnce() -> C) {
     let mut stream = ComponentStream::new(func);
 
+    let mut stream = stream.enter();
     while let Some(_) = stream.next().await {
         stream.component().draw();
     }

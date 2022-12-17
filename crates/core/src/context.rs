@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -12,6 +13,44 @@ use futures_core::Stream;
 
 use crate::AsyncComponent;
 
+thread_local! {
+    static CONTEXT: RefCell<Option<StateContext>> = RefCell::new(None);
+}
+
+pub fn current_context() -> StateContext {
+    CONTEXT.with(|cx| match *cx.borrow() {
+        Some(ref cx) => cx.clone(),
+        None => panic!("Called without state context"),
+    })
+}
+
+#[derive(Debug)]
+struct EnterContextGuard {}
+
+impl Drop for EnterContextGuard {
+    fn drop(&mut self) {
+        CONTEXT.with(|cell| {
+            *cell.borrow_mut() = None;
+        })
+    }
+}
+
+fn enter_guarded(cx: StateContext) -> EnterContextGuard {
+    CONTEXT.with(|cell| {
+        {
+            let mut cell = cell.borrow_mut();
+
+            if cell.is_some() {
+                panic!("State context is already set");
+            }
+
+            *cell = Some(cx);
+        }
+
+        EnterContextGuard {}
+    })
+}
+
 #[derive(Debug)]
 pub struct ComponentStream<C> {
     inner: Arc<Inner>,
@@ -20,32 +59,51 @@ pub struct ComponentStream<C> {
 
 impl<C: AsyncComponent> ComponentStream<C> {
     /// Create new [`ComponentStream`]
-    pub fn new(func: impl FnOnce(&StateContext) -> C) -> Self {
+    pub fn new(func: impl FnOnce() -> C) -> Self {
         let inner = Arc::new(Inner::default());
 
-        let cx = StateContext::new(Waker::from(inner.clone()));
-        let component = func(&cx);
+        let component = {
+            let _guard = enter_guarded(StateContext::new(Waker::from(inner.clone())));
+
+            func()
+        };
 
         Self { inner, component }
     }
 
-    pub fn component(&self) -> &C {
-        &self.component
-    }
-
-    pub fn component_mut(&mut self) -> &mut C {
-        &mut self.component
+    /// Enter context scope with stream
+    pub fn enter<'a>(&'a mut self) -> EnteredComponentStream<'a, C> {
+        EnteredComponentStream {
+            _guard: enter_guarded(StateContext::new(Waker::from(self.inner.clone()))),
+            stream: self,
+        }
     }
 }
 
-impl<C: AsyncComponent> Stream for ComponentStream<C> {
+#[derive(Debug)]
+pub struct EnteredComponentStream<'a, C> {
+    _guard: EnterContextGuard,
+    stream: &'a mut ComponentStream<C>,
+}
+
+impl<C> EnteredComponentStream<'_, C> {
+    pub fn component(&self) -> &C {
+        &self.stream.component
+    }
+
+    pub fn component_mut(&mut self) -> &mut C {
+        &mut self.stream.component
+    }
+}
+
+impl<C: AsyncComponent> Stream for EnteredComponentStream<'_, C> {
     type Item = ();
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<()>> {
-        self.inner.waker.register(cx.waker());
+        self.stream.inner.waker.register(cx.waker());
 
-        self.component.update_component();
-        if self.inner.updated.swap(false, Ordering::Relaxed) {
+        if self.stream.inner.updated.swap(false, Ordering::Relaxed) {
+            self.stream.component.update_component();
             Poll::Ready(Some(()))
         } else {
             Poll::Pending

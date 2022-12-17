@@ -2,7 +2,7 @@
 
 pub mod executor;
 
-use async_component_core::{context::StateContext, AsyncComponent};
+use async_component_core::AsyncComponent;
 use executor::{ExecutorPollEvent, WinitExecutor};
 use winit::{
     event::Event,
@@ -17,7 +17,7 @@ pub trait WinitComponent {
 /// Convenience method for initializing executor and running winit eventloop
 pub fn run<C: AsyncComponent + WinitComponent + 'static>(
     event_loop: EventLoop<ExecutorPollEvent>,
-    func: impl FnOnce(&StateContext) -> C,
+    func: impl FnOnce() -> C,
 ) -> ! {
     let executor = WinitExecutor::new(event_loop);
 

@@ -5,7 +5,7 @@
 pub mod __private;
 pub mod context;
 
-use context::StateContext;
+use context::current_context;
 use futures_core::Stream;
 
 use std::{
@@ -34,18 +34,16 @@ pub trait State {
 /// This will also send signal when the cell is constructed or dropped.
 #[derive(Debug)]
 pub struct StateCell<T> {
-    cx: StateContext,
     changed: bool,
     inner: T,
 }
 
 impl<T> StateCell<T> {
-    /// Create new [`StateCell`] with [`StateContext`]
-    pub fn new(cx: StateContext, inner: T) -> Self {
-        cx.signal();
+    /// Create new [`StateCell`]
+    pub fn new(inner: T) -> Self {
+        current_context().signal();
 
         Self {
-            cx,
             changed: true,
             inner,
         }
@@ -58,7 +56,7 @@ impl<T> StateCell<T> {
             this.changed = true;
         }
 
-        this.cx.signal()
+        current_context().signal();
     }
 }
 
@@ -91,24 +89,28 @@ impl<T> State for StateCell<T> {
     }
 }
 
+impl<T> From<T> for StateCell<T> {
+    fn from(inner: T) -> Self {
+        Self::new(inner)
+    }
+}
+
 impl<T> Drop for StateCell<T> {
     fn drop(&mut self) {
-        self.cx.signal();
+        current_context().signal();
     }
 }
 
 /// State which polls inner stream
 #[derive(Debug)]
 pub struct StreamCell<T> {
-    cx: StateContext,
     inner: T,
 }
 
 impl<T: Stream> StreamCell<T> {
-    pub fn new(cx: StateContext, inner: T) -> Self {
-        cx.signal();
-
-        Self { cx, inner }
+    pub fn new(inner: T) -> Self {
+        current_context().signal();
+        Self { inner }
     }
 }
 
@@ -116,15 +118,21 @@ impl<T: Stream + Unpin> State for StreamCell<T> {
     type Output = T::Item;
 
     fn update(this: &mut Self) -> Option<Self::Output> {
-        match Pin::new(&mut this.inner).poll_next(&mut this.cx.task_context()) {
+        match Pin::new(&mut this.inner).poll_next(&mut current_context().task_context()) {
             Poll::Ready(Some(output)) => Some(output),
             _ => None,
         }
     }
 }
 
+impl<T: Stream> From<T> for StreamCell<T> {
+    fn from(inner: T) -> Self {
+        Self::new(inner)
+    }
+}
+
 impl<T> Drop for StreamCell<T> {
     fn drop(&mut self) {
-        self.cx.signal();
+        current_context().signal();
     }
 }
