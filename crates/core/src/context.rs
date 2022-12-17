@@ -17,9 +17,9 @@ thread_local! {
     static CONTEXT: RefCell<Option<StateContext>> = RefCell::new(None);
 }
 
-pub fn current_context() -> StateContext {
+pub fn with_current_context<R>(func: impl FnOnce(&StateContext) -> R) -> R {
     CONTEXT.with(|cx| match *cx.borrow() {
-        Some(ref cx) => cx.clone(),
+        Some(ref cx) => func(cx),
         None => panic!("Called without state context"),
     })
 }

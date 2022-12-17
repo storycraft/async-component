@@ -5,7 +5,7 @@
 pub mod __private;
 pub mod context;
 
-use context::current_context;
+use context::{with_current_context, StateContext};
 use futures_core::Stream;
 
 use std::{
@@ -41,7 +41,7 @@ pub struct StateCell<T> {
 impl<T> StateCell<T> {
     /// Create new [`StateCell`]
     pub fn new(inner: T) -> Self {
-        current_context().signal();
+        with_current_context(StateContext::signal);
 
         Self {
             changed: true,
@@ -56,7 +56,7 @@ impl<T> StateCell<T> {
             this.changed = true;
         }
 
-        current_context().signal();
+        with_current_context(StateContext::signal);
     }
 }
 
@@ -103,7 +103,7 @@ impl<T: Default> Default for StateCell<T> {
 
 impl<T> Drop for StateCell<T> {
     fn drop(&mut self) {
-        current_context().signal();
+        with_current_context(StateContext::signal);
     }
 }
 
@@ -115,7 +115,7 @@ pub struct StreamCell<T> {
 
 impl<T: Stream> StreamCell<T> {
     pub fn new(inner: T) -> Self {
-        current_context().signal();
+        with_current_context(StateContext::signal);
         Self { inner }
     }
 }
@@ -124,10 +124,12 @@ impl<T: Stream + Unpin> State for StreamCell<T> {
     type Output = T::Item;
 
     fn update(this: &mut Self) -> Option<Self::Output> {
-        match Pin::new(&mut this.inner).poll_next(&mut current_context().task_context()) {
-            Poll::Ready(Some(output)) => Some(output),
-            _ => None,
-        }
+        with_current_context(|cx| {
+            match Pin::new(&mut this.inner).poll_next(&mut cx.task_context()) {
+                Poll::Ready(Some(output)) => Some(output),
+                _ => None,
+            }
+        })
     }
 }
 
@@ -145,6 +147,6 @@ impl<T: Stream + Default> Default for StreamCell<T> {
 
 impl<T> Drop for StreamCell<T> {
     fn drop(&mut self) {
-        current_context().signal();
+        with_current_context(StateContext::signal);
     }
 }
