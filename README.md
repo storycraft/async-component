@@ -10,6 +10,8 @@ See `examples/gui-demo` project for example using with gui(winit, raqote, pixels
 ```Rust
 use async_component::AsyncComponent;
 
+// AsyncComponent trait only has update method which is like future and context is available globally when accessing component.
+// Due to this behavior intergrating with async functions are very easy without async trait support. See StreamCell below.
 #[derive(Debug, AsyncComponent)]
 struct CounterComponent {
     // State must be wrapped with StateCell
@@ -17,8 +19,7 @@ struct CounterComponent {
     counter: StateCell<i32>,
 
     // Stream
-    // It iterates every queued items in single poll to prevent slowdown.
-    // If the stream is immediate and resolves indefinitely, the task will fall to infinite loop. See expanded code below.
+    // Async stream is polled using global component context
     #[state(Self::on_counter_recv)]
     counter_recv: StreamCell<Receiver<i32>>,
 }
